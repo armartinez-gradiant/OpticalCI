@@ -1,0 +1,5 @@
+# Requerimientos para desarrollo
+torch>=2.0.0
+tensorflow>=2.12.0
+pyutils>=0.0.2
+numpy>=1.24.0
