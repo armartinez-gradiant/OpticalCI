@@ -1,12 +1,50 @@
+"""
+MZI Layer - Basic implementation for PtONN-TESTS
+"""
+
 import torch
 import torch.nn as nn
+from typing import Optional, Union
 
 class MZILayer(nn.Module):
-    """Interferómetro Mach-Zehnder parametrizado como capa de PyTorch."""
-    def __init__(self, phase: float = 0.0):
-        super().__init__()
-        self.phase = nn.Parameter(torch.tensor(phase))
-
+    """
+    Basic MZI Layer implementation
+    """
+    
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        device: Optional[Union[str, torch.device]] = None,
+        dtype: Optional[torch.dtype] = None,
+    ):
+        super(MZILayer, self).__init__()
+        
+        self.in_features = in_features
+        self.out_features = out_features
+        
+        # Configurar device
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if isinstance(device, str):
+            device = torch.device(device)
+        self.device = device
+        
+        if dtype is None:
+            dtype = torch.float32
+        self.dtype = dtype
+        
+        # Parámetros simples
+        self.weight = nn.Parameter(torch.randn(out_features, in_features, device=device, dtype=dtype))
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        """Reinicializar parámetros."""
+        nn.init.xavier_uniform_(self.weight)
+        
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Ejemplo: combinación lineal según fase
-        return x * torch.cos(self.phase) + x * torch.sin(self.phase)
+        """Forward pass."""
+        return torch.mm(x, self.weight.t())
+        
+    def extra_repr(self) -> str:
+        return f"in_features={self.in_features}, out_features={self.out_features}"
