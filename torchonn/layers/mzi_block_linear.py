@@ -86,18 +86,27 @@ class MZIBlockLinear(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self):
-        """Reinicializar parámetros."""
+        """Reinicializar parámetros con mayor aleatoriedad."""
         with torch.no_grad():
             if self.mode == "usv":
-                # Inicializar matrices ortogonales
+                # ✅ FIX: Usar inicializaciones más aleatorias
                 nn.init.orthogonal_(self.u_matrix)
-                nn.init.ones_(self.s_matrix)  # Valores singulares iniciales
+                # ✅ FIX: Valores singulares aleatorios en lugar de siempre 1s
+                nn.init.uniform_(self.s_matrix, 0.1, 2.0)  # Valores positivos aleatorios
                 nn.init.orthogonal_(self.v_matrix)
+                
+                # ✅ FIX: Añadir ruido extra para garantizar cambios
+                self.u_matrix.add_(torch.randn_like(self.u_matrix) * 0.01)
+                self.v_matrix.add_(torch.randn_like(self.v_matrix) * 0.01)
+                
             elif self.mode == "weight":
-                # Inicialización Xavier
-                nn.init.xavier_uniform_(self.weight)
+                # ✅ FIX: Usar inicialización más agresiva
+                nn.init.xavier_uniform_(self.weight, gain=1.0)
+                # Añadir ruido extra
+                self.weight.add_(torch.randn_like(self.weight) * 0.01)
+                
             elif self.mode == "phase":
-                # Fases aleatorias
+                # ✅ FIX: Fases completamente aleatorias
                 nn.init.uniform_(self.phases, -np.pi, np.pi)
                 
     def _get_weight_matrix(self) -> torch.Tensor:

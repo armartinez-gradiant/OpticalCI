@@ -115,6 +115,9 @@ class TestCompleteIntegration:
         import tempfile
         import os
         
+        # Set deterministic behavior
+        torch.manual_seed(42)
+        
         # Create and train model
         model = CompleteONNModel()
         optimizer = torch.optim.Adam(model.parameters())
@@ -146,9 +149,15 @@ class TestCompleteIntegration:
             new_model.load_state_dict(checkpoint['model_state_dict'])
             new_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             
-            # Verify loaded model works
-            new_output = new_model(x)
-            assert torch.allclose(output, new_output, atol=1e-6)
+            # ✅ FIX: Set both models to eval mode to disable dropout
+            model.eval()
+            new_model.eval()
+            
+            # ✅ FIX: Use same input for reproducible comparison
+            with torch.no_grad():
+                output_original = model(x)
+                new_output = new_model(x)
+                assert torch.allclose(output_original, new_output, atol=1e-6)
             
             # Cleanup
             os.unlink(f.name)
@@ -243,16 +252,24 @@ class TestCompleteIntegration:
         optimizer.zero_grad()
         loss.backward()
         
-        # Check gradients before clipping
-        grad_norm_before = torch.nn.utils.clip_grad_norm_(model.parameters(), float('inf'))
-        
-        # Apply gradient clipping
+        # ✅ FIX: Apply gradient clipping and get original norm
         max_norm = 1.0
-        grad_norm_after = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+        grad_norm_before = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
         
-        # Verify clipping worked
+        # ✅ FIX: Calculate norm after clipping manually
+        grad_norm_after = 0.0
+        for param in model.parameters():
+            if param.grad is not None:
+                grad_norm_after += param.grad.data.norm(2).item() ** 2
+        grad_norm_after = grad_norm_after ** 0.5
+        
+        # ✅ FIX: Verify clipping worked correctly
         if grad_norm_before > max_norm:
+            # If gradients were clipped, the norm should be approximately max_norm
             assert abs(grad_norm_after - max_norm) < 1e-6
+        else:
+            # If gradients were not clipped, norm should be unchanged
+            assert abs(grad_norm_after - grad_norm_before) < 1e-6
     
     def test_different_precisions(self):
         """Test with different floating point precisions."""

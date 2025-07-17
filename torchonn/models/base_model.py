@@ -22,6 +22,6 @@ class ONNBaseModel(nn.Module):
         
     def reset_parameters(self):
         """Reset all parameters in the model."""
-        for module in self.modules():
+        for module in self.children():  # ✅ FIX: usar children() en lugar de modules()
             if hasattr(module, 'reset_parameters'):
                 module.reset_parameters()
