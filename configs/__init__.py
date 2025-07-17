@@ -1,0 +1,1 @@
+"""Módulo configs de TorchONN"""
