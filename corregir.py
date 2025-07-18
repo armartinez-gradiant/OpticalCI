@@ -1,302 +1,400 @@
 #!/usr/bin/env python3
 """
-Fix All - Reparación Automática Completa para PtONN-TESTS
-=========================================================
+Script de Actualización de Dependencias
+=======================================
 
-Este script hace TODO automáticamente para solucionar el problema
-"_C is not defined" de PyTorch y dejar PtONN-TESTS completamente funcional.
+Actualiza todas las dependencias del proyecto para ser compatibles
+con las versiones más recientes de PyTorch.
 
-¡Solo ejecuta este script y listo!
+Basado en la matriz de compatibilidad oficial de PyTorch:
+https://github.com/pytorch/pytorch/wiki/PyTorch-Versions
 """
 
 import os
 import sys
-import subprocess
-import shutil
-import platform
 from pathlib import Path
-import importlib.util
 
-def run_command(cmd, description="", ignore_errors=False):
-    """Ejecutar comando con manejo de errores"""
-    print(f"🔄 {description}")
+def print_step(step_num, description):
+    """Print formatted step"""
+    print(f"\n{step_num}️⃣ {description}")
+    print("-" * 50)
+
+def update_requirements_txt():
+    """Actualizar requirements.txt"""
+    print_step(1, "ACTUALIZANDO requirements.txt")
+    
+    requirements_file = Path("requirements.txt")
+    
+    # Dependencias actualizadas con versiones compatibles
+    new_requirements = """torch>=2.0.0,<2.8.0
+torchvision>=0.15.0,<0.23.0
+torchaudio>=2.0.0,<2.8.0
+numpy>=1.19.0,<2.0.0
+scipy>=1.7.0,<1.15.0
+matplotlib>=3.3.0,<4.0.0
+pyyaml>=5.4.0,<7.0.0
+tqdm>=4.60.0,<5.0.0
+pytest>=6.0.0,<8.0.0
+pytest-cov>=2.0.0,<5.0.0
+black>=21.0.0,<25.0.0
+flake8>=3.8.0,<7.0.0
+"""
+    
     try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        if result.returncode == 0:
-            print(f"   ✅ Éxito")
-            return True
-        else:
-            print(f"   ⚠️  Salida: {result.stderr.strip()}")
-            if not ignore_errors:
-                print(f"   ❌ Error, pero continuando...")
-            return False
+        with open(requirements_file, 'w') as f:
+            f.write(new_requirements)
+        print(f"✅ {requirements_file} actualizado")
+        print("   📋 Cambios principales:")
+        print("      • torchvision: <0.20.0 → <0.23.0")
+        print("      • scipy: <1.13.0 → <1.15.0")
+        return True
     except Exception as e:
-        print(f"   ❌ Excepción: {e}")
+        print(f"❌ Error actualizando {requirements_file}: {e}")
         return False
 
-def clean_python_files():
-    """Limpiar archivos Python compilados"""
-    print("\n🧹 LIMPIANDO ARCHIVOS PYTHON")
-    print("=" * 50)
+def update_setup_py():
+    """Actualizar setup.py"""
+    print_step(2, "ACTUALIZANDO setup.py")
     
-    current_dir = Path.cwd()
+    setup_file = Path("setup.py")
     
-    # Limpiar __pycache__
-    pycache_dirs = list(current_dir.rglob("__pycache__"))
-    for pycache_dir in pycache_dirs:
-        try:
-            shutil.rmtree(pycache_dir)
-            print(f"   ✅ Eliminado: {pycache_dir.name}")
-        except Exception as e:
-            print(f"   ⚠️  Error eliminando {pycache_dir}: {e}")
+    if not setup_file.exists():
+        print(f"⚠️  {setup_file} no existe")
+        return True
     
-    # Limpiar .pyc
-    pyc_files = list(current_dir.rglob("*.pyc"))
-    for pyc_file in pyc_files:
-        try:
-            pyc_file.unlink()
-            print(f"   ✅ Eliminado: {pyc_file.name}")
-        except Exception as e:
-            print(f"   ⚠️  Error eliminando {pyc_file}: {e}")
-    
-    # Limpiar imports en memoria
-    modules_to_remove = []
-    for module_name in sys.modules:
-        if 'torch' in module_name or 'torchonn' in module_name:
-            modules_to_remove.append(module_name)
-    
-    for module_name in modules_to_remove:
-        try:
-            del sys.modules[module_name]
-            print(f"   ✅ Eliminado de memoria: {module_name}")
-        except:
-            pass
-    
-    print("   🎉 Limpieza completada")
-
-def fix_pytorch():
-    """Reparar PyTorch completamente"""
-    print("\n🔥 REPARANDO PYTORCH")
-    print("=" * 50)
-    
-    # 1. Limpiar cache
-    run_command("pip cache purge", "Limpiando cache pip", ignore_errors=True)
-    
-    # 2. Actualizar pip
-    run_command("pip install --upgrade pip", "Actualizando pip", ignore_errors=True)
-    
-    # 3. Desinstalar PyTorch
-    print("\n🗑️  Desinstalando PyTorch actual...")
-    run_command("pip uninstall torch -y", "Desinstalando torch", ignore_errors=True)
-    run_command("pip uninstall torchvision -y", "Desinstalando torchvision", ignore_errors=True)
-    run_command("pip uninstall torchaudio -y", "Desinstalando torchaudio", ignore_errors=True)
-    run_command("pip uninstall pytorch -y", "Desinstalando pytorch", ignore_errors=True)
-    
-    # 4. Instalar NumPy compatible
-    print("\n🔢 Instalando NumPy compatible...")
-    run_command("pip install 'numpy>=1.19.0,<2.0.0'", "Instalando NumPy < 2.0")
-    
-    # 5. Reinstalar PyTorch
-    print("\n🔥 Reinstalando PyTorch...")
-    
-    # Detectar plataforma
-    if platform.system() == "Linux":
-        pytorch_cmd = "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
-    elif platform.system() == "Windows":
-        pytorch_cmd = "pip install torch torchvision torchaudio"
-    elif platform.system() == "Darwin":  # macOS
-        pytorch_cmd = "pip install torch torchvision torchaudio"
-    else:
-        pytorch_cmd = "pip install torch torchvision torchaudio"
-    
-    success = run_command(pytorch_cmd, "Instalando PyTorch")
-    
-    if not success:
-        print("   ⚠️  Instalación estándar falló, intentando alternativa...")
-        run_command("pip install torch torchvision torchaudio --no-cache-dir", "Instalación alternativa")
-    
-    # 6. Instalar dependencias adicionales
-    print("\n📦 Instalando dependencias adicionales...")
-    run_command("pip install scipy matplotlib pyyaml tqdm", "Instalando dependencias", ignore_errors=True)
-
-def install_ptonn():
-    """Instalar PtONN-TESTS"""
-    print("\n📦 INSTALANDO PtONN-TESTS")
-    print("=" * 50)
-    
-    # Instalar en modo desarrollo
-    run_command("pip install -e .", "Instalando PtONN-TESTS en modo desarrollo")
-
-def verify_installation():
-    """Verificar que todo funciona"""
-    print("\n✅ VERIFICANDO INSTALACIÓN")
-    print("=" * 50)
-    
-    # Test PyTorch
     try:
-        import torch
-        print(f"   ✅ PyTorch: {torch.__version__}")
+        with open(setup_file, 'r') as f:
+            content = f.read()
         
-        # Test tensor
-        x = torch.randn(2, 3)
-        print(f"   ✅ Tensor creation: {x.shape}")
+        # Actualizaciones específicas
+        replacements = [
+            ('torchvision>=0.15.0,<0.20.0', 'torchvision>=0.15.0,<0.23.0'),
+            ('scipy>=1.7.0,<1.13.0', 'scipy>=1.7.0,<1.15.0'),
+            ('numpy>=1.19.0,<2.0.0', 'numpy>=1.19.0,<2.0.0'),  # Mantener
+            ('torch>=2.0.0,<2.8.0', 'torch>=2.0.0,<2.8.0'),    # Mantener
+            ('torchaudio>=2.0.0,<2.8.0', 'torchaudio>=2.0.0,<2.8.0'),  # Mantener
+        ]
         
-        # Test _C module
-        if hasattr(torch, '_C'):
-            print(f"   ✅ torch._C: Disponible")
-        else:
-            print(f"   ⚠️  torch._C: No disponible (pero puede funcionar)")
+        for old, new in replacements:
+            content = content.replace(old, new)
         
+        with open(setup_file, 'w') as f:
+            f.write(content)
+        
+        print(f"✅ {setup_file} actualizado")
+        return True
     except Exception as e:
-        print(f"   ❌ PyTorch error: {e}")
+        print(f"❌ Error actualizando {setup_file}: {e}")
         return False
+
+def update_pyproject_toml():
+    """Actualizar pyproject.toml"""
+    print_step(3, "ACTUALIZANDO pyproject.toml")
     
-    # Test TorchONN
+    pyproject_file = Path("pyproject.toml")
+    
+    if not pyproject_file.exists():
+        print(f"⚠️  {pyproject_file} no existe")
+        return True
+    
     try:
-        import torchonn
-        print(f"   ✅ TorchONN: {torchonn.__version__}")
+        with open(pyproject_file, 'r') as f:
+            content = f.read()
         
-        from torchonn.layers import MZILayer, MZIBlockLinear
-        print(f"   ✅ Layers: Importados correctamente")
+        # Actualizaciones específicas
+        replacements = [
+            ('torchvision>=0.15.0,<0.20.0', 'torchvision>=0.15.0,<0.23.0'),
+            ('scipy>=1.7.0,<1.13.0', 'scipy>=1.7.0,<1.15.0'),
+            ('matplotlib>=3.3.0,<4.0.0', 'matplotlib>=3.3.0,<4.0.0'),
+            ('pyyaml>=5.4.0,<7.0.0', 'pyyaml>=5.4.0,<7.0.0'),
+            ('tqdm>=4.60.0,<5.0.0', 'tqdm>=4.60.0,<5.0.0'),
+        ]
         
-        from torchonn.models import ONNBaseModel
-        print(f"   ✅ Models: Importados correctamente")
+        for old, new in replacements:
+            content = content.replace(old, new)
         
-        # Test funcionalidad
-        layer = MZILayer(4, 3)
-        x = torch.randn(2, 4)
-        output = layer(x)
-        print(f"   ✅ Funcionalidad: {x.shape} -> {output.shape}")
+        with open(pyproject_file, 'w') as f:
+            f.write(content)
         
+        print(f"✅ {pyproject_file} actualizado")
+        return True
     except Exception as e:
-        print(f"   ❌ TorchONN error: {e}")
+        print(f"❌ Error actualizando {pyproject_file}: {e}")
         return False
+
+def update_pyproyect_toml():
+    """Actualizar pyproyect.toml (archivo duplicado)"""
+    print_step(4, "ACTUALIZANDO pyproyect.toml")
     
-    # Test gradientes
+    pyproyect_file = Path("pyproyect.toml")
+    
+    if not pyproyect_file.exists():
+        print(f"⚠️  {pyproyect_file} no existe")
+        return True
+    
     try:
-        x = torch.randn(2, 4, requires_grad=True)
-        layer = MZILayer(4, 3)
-        output = layer(x)
-        loss = output.sum()
-        loss.backward()
-        print(f"   ✅ Gradientes: Funcionan correctamente")
+        with open(pyproyect_file, 'r') as f:
+            content = f.read()
         
+        # Actualizaciones específicas
+        replacements = [
+            ('torchvision>=0.15.0,<0.20.0', 'torchvision>=0.15.0,<0.23.0'),
+            ('scipy>=1.7.0,<1.13.0', 'scipy>=1.7.0,<1.15.0'),
+        ]
+        
+        for old, new in replacements:
+            content = content.replace(old, new)
+        
+        with open(pyproyect_file, 'w') as f:
+            f.write(content)
+        
+        print(f"✅ {pyproyect_file} actualizado")
+        return True
     except Exception as e:
-        print(f"   ❌ Gradientes error: {e}")
+        print(f"❌ Error actualizando {pyproyect_file}: {e}")
         return False
+
+def show_compatibility_matrix():
+    """Mostrar matriz de compatibilidad"""
+    print_step(5, "MATRIZ DE COMPATIBILIDAD PYTORCH")
     
-    return True
-
-def create_test_files():
-    """Crear archivos de test seguros"""
-    print("\n📝 CREANDO ARCHIVOS DE TEST")
-    print("=" * 50)
+    matrix = [
+        ("PyTorch 2.7.x", "torchvision 0.22.x", "torchaudio 2.7.x"),
+        ("PyTorch 2.6.x", "torchvision 0.21.x", "torchaudio 2.6.x"),
+        ("PyTorch 2.5.x", "torchvision 0.20.x", "torchaudio 2.5.x"),
+        ("PyTorch 2.4.x", "torchvision 0.19.x", "torchaudio 2.4.x"),
+        ("PyTorch 2.3.x", "torchvision 0.18.x", "torchaudio 2.3.x"),
+        ("PyTorch 2.2.x", "torchvision 0.17.x", "torchaudio 2.2.x"),
+        ("PyTorch 2.1.x", "torchvision 0.16.x", "torchaudio 2.1.x"),
+        ("PyTorch 2.0.x", "torchvision 0.15.x", "torchaudio 2.0.x"),
+    ]
     
-    # Crear test simple
-    test_simple = '''#!/usr/bin/env python3
-"""Test simple para verificar que todo funciona"""
-import torch
-import torchonn
-from torchonn.layers import MZILayer
+    print("📋 Matriz de compatibilidad oficial:")
+    print("   PyTorch        | torchvision    | torchaudio")
+    print("   ---------------|----------------|----------------")
+    for pytorch, torchvision, torchaudio in matrix:
+        print(f"   {pytorch:<14} | {torchvision:<14} | {torchaudio}")
+    
+    print("\n🔍 Problema detectado:")
+    print("   • Usuario tiene: PyTorch 2.7.1 + torchvision 0.22.1")
+    print("   • Proyecto requería: torchvision<0.20.0")
+    print("   • Solución: Actualizar límites a torchvision<0.23.0")
 
-print("🧪 Test Simple PtONN-TESTS")
-print("=" * 40)
-
-# Test PyTorch
-x = torch.randn(2, 4)
-print(f"✅ PyTorch: {torch.__version__}")
-print(f"✅ Tensor: {x.shape}")
-
-# Test TorchONN
-layer = MZILayer(4, 3)
-output = layer(x)
-print(f"✅ TorchONN: {torchonn.__version__}")
-print(f"✅ MZI Layer: {x.shape} -> {output.shape}")
-
-# Test gradientes
-x.requires_grad_(True)
-output = layer(x)
-loss = output.sum()
-loss.backward()
-print(f"✅ Gradientes: OK")
-
-print("\\n🎉 ¡Todo funciona correctamente!")
+def create_install_script():
+    """Crear script de instalación compatible"""
+    print_step(6, "CREANDO SCRIPT DE INSTALACIÓN")
+    
+    install_script = """#!/usr/bin/env python3
 '''
-    
-    with open("test_simple_final.py", "w") as f:
-        f.write(test_simple)
-    
-    print("   ✅ test_simple_final.py creado")
-    
-    # Hacer ejecutable
-    os.chmod("test_simple_final.py", 0o755)
+Script de Instalación Compatible PyTorch
+========================================
 
-def main():
-    """Función principal - hace todo automáticamente"""
-    print("🚀 FIX ALL - REPARACIÓN AUTOMÁTICA COMPLETA")
-    print("=" * 70)
-    print("\nEste script solucionará AUTOMÁTICAMENTE el problema de PyTorch")
-    print("y dejará PtONN-TESTS completamente funcional.")
-    print("\n¡Solo relájate y espera! 🍿")
+Instala PyTorch con versiones compatibles automáticamente.
+'''
+
+import subprocess
+import sys
+
+def install_pytorch_compatible():
+    \"\"\"Instalar PyTorch con versiones compatibles\"\"\"
+    print("🔥 Instalando PyTorch con versiones compatibles...")
     
-    # Información del sistema
-    print(f"\n🖥️  Sistema: {platform.system()} {platform.release()}")
-    print(f"🐍 Python: {sys.version}")
-    print(f"📁 Directorio: {os.getcwd()}")
+    # Para CPU (más estable)
+    cmd_cpu = [
+        sys.executable, "-m", "pip", "install",
+        "torch>=2.0.0,<2.8.0",
+        "torchvision>=0.15.0,<0.23.0", 
+        "torchaudio>=2.0.0,<2.8.0",
+        "--index-url", "https://download.pytorch.org/whl/cpu"
+    ]
     
     try:
-        # Paso 1: Limpieza
-        clean_python_files()
-        
-        # Paso 2: Reparar PyTorch
-        fix_pytorch()
-        
-        # Paso 3: Instalar PtONN-TESTS
-        install_ptonn()
-        
-        # Paso 4: Verificar
-        if verify_installation():
-            print("\n🎉 ¡REPARACIÓN COMPLETADA CON ÉXITO!")
-            
-            # Crear archivos de test
-            create_test_files()
-            
-            print("\n" + "=" * 70)
-            print("✨ PtONN-TESTS ESTÁ COMPLETAMENTE FUNCIONAL ✨")
-            print("=" * 70)
-            
-            print("\n📝 Para verificar, ejecuta:")
-            print("   python test_simple_final.py")
-            print("   python test_installation.py")
-            print("   pytest tests/ -v")
-            
-            print("\n🚀 Para empezar a usar:")
-            print("   python examples/basic_usage.py")
-            print("   python examples/advanced_usage.py")
-            print("   python explore.py")
-            
-            print("\n🎯 ¡Ya puedes construir redes neuronales ópticas!")
-            
-        else:
-            print("\n⚠️  ALGUNOS PROBLEMAS PERSISTEN")
-            print("\n🔧 Intenta estos pasos manuales:")
-            print("1. Verificar entorno virtual activo")
-            print("2. Ejecutar: pip install torch torchvision torchaudio --force-reinstall")
-            print("3. Ejecutar: pip install -e .")
-            print("4. Ejecutar: python test_simple_final.py")
-            
-    except KeyboardInterrupt:
-        print("\n👋 Proceso interrumpido por el usuario")
-    except Exception as e:
-        print(f"\n❌ Error inesperado: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        print("\n🔧 Solución manual:")
-        print("1. pip uninstall torch torchvision torchaudio -y")
-        print("2. pip install 'numpy>=1.19.0,<2.0.0'")
-        print("3. pip install torch torchvision torchaudio")
-        print("4. pip install -e .")
+        subprocess.run(cmd_cpu, check=True)
+        print("✅ PyTorch instalado exitosamente")
+        return True
+    except subprocess.CalledProcessError:
+        print("❌ Error instalando PyTorch")
+        return False
+
+def install_dependencies():
+    \"\"\"Instalar dependencias del proyecto\"\"\"
+    print("📦 Instalando dependencias del proyecto...")
+    
+    cmd_deps = [
+        sys.executable, "-m", "pip", "install",
+        "numpy>=1.19.0,<2.0.0",
+        "scipy>=1.7.0,<1.15.0",
+        "matplotlib>=3.3.0,<4.0.0",
+        "pyyaml>=5.4.0,<7.0.0",
+        "tqdm>=4.60.0,<5.0.0"
+    ]
+    
+    try:
+        subprocess.run(cmd_deps, check=True)
+        print("✅ Dependencias instaladas")
+        return True
+    except subprocess.CalledProcessError:
+        print("❌ Error instalando dependencias")
+        return False
+
+def install_project():
+    \"\"\"Instalar proyecto en modo desarrollo\"\"\"
+    print("🔧 Instalando proyecto en modo desarrollo...")
+    
+    cmd_proj = [sys.executable, "-m", "pip", "install", "-e", "."]
+    
+    try:
+        subprocess.run(cmd_proj, check=True)
+        print("✅ Proyecto instalado")
+        return True
+    except subprocess.CalledProcessError:
+        print("❌ Error instalando proyecto")
+        return False
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Instalación Compatible PyTorch + PtONN-TESTS")
+    print("=" * 60)
+    
+    steps = [
+        ("PyTorch compatible", install_pytorch_compatible),
+        ("Dependencias", install_dependencies),
+        ("Proyecto", install_project)
+    ]
+    
+    for step_name, step_func in steps:
+        print(f"\\n⏳ {step_name}...")
+        if not step_func():
+            print(f"❌ Error en: {step_name}")
+            sys.exit(1)
+    
+    print("\\n🎉 ¡Instalación completada!")
+    print("\\nPuedes probar con:")
+    print("   python -c 'import torch; print(torch.__version__)'")
+    print("   python quick_test.py")
+"""
+    
+    try:
+        with open("install_compatible.py", 'w') as f:
+            f.write(install_script)
+        
+        # Hacer ejecutable
+        os.chmod("install_compatible.py", 0o755)
+        
+        print("✅ Script creado: install_compatible.py")
+        return True
+    except Exception as e:
+        print(f"❌ Error creando script: {e}")
+        return False
+
+def verify_current_versions():
+    """Verificar versiones actuales"""
+    print_step(7, "VERIFICANDO VERSIONES ACTUALES")
+    
+    try:
+        import torch
+        import torchvision
+        import torchaudio
+        
+        print(f"📋 Versiones instaladas:")
+        print(f"   PyTorch: {torch.__version__}")
+        print(f"   torchvision: {torchvision.__version__}")
+        print(f"   torchaudio: {torchaudio.__version__}")
+        
+        # Verificar compatibilidad
+        torch_version = torch.__version__.split('+')[0]  # Remove +cpu suffix
+        torchvision_version = torchvision.__version__.split('+')[0]
+        
+        # Matriz de compatibilidad simplificada
+        compatible_pairs = {
+            "2.7": "0.22",
+            "2.6": "0.21", 
+            "2.5": "0.20",
+            "2.4": "0.19",
+            "2.3": "0.18",
+            "2.2": "0.17",
+            "2.1": "0.16",
+            "2.0": "0.15"
+        }
+        
+        torch_major_minor = '.'.join(torch_version.split('.')[:2])
+        torchvision_major_minor = '.'.join(torchvision_version.split('.')[:2])
+        
+        expected_torchvision = compatible_pairs.get(torch_major_minor, "unknown")
+        
+        if expected_torchvision != "unknown" and torchvision_major_minor == expected_torchvision:
+            print("✅ Versiones compatibles")
+        else:
+            print("⚠️  Versiones podrían ser incompatibles")
+            print(f"   PyTorch {torch_major_minor} esperaba torchvision {expected_torchvision}")
+            print(f"   Pero tienes torchvision {torchvision_major_minor}")
+        
+        return True
+    except ImportError as e:
+        print(f"❌ Error importando: {e}")
+        return False
+    except Exception as e:
+        print(f"❌ Error verificando: {e}")
+        return False
+
+def main():
+    """Función principal"""
+    print("🔧 ACTUALIZACIÓN DE DEPENDENCIAS PYTORCH")
+    print("=" * 60)
+    print("Solucionando conflictos de dependencias...")
+    print("=" * 60)
+    
+    # Verificar versiones actuales
+    verify_current_versions()
+    
+    # Actualizar archivos
+    steps = [
+        ("Actualizar requirements.txt", update_requirements_txt),
+        ("Actualizar setup.py", update_setup_py),
+        ("Actualizar pyproject.toml", update_pyproject_toml),
+        ("Actualizar pyproyect.toml", update_pyproyect_toml),
+        ("Mostrar matriz compatibilidad", show_compatibility_matrix),
+        ("Crear script instalación", create_install_script),
+    ]
+    
+    success_count = 0
+    for step_name, step_func in steps:
+        try:
+            if step_func():
+                success_count += 1
+                print(f"✅ {step_name}: ÉXITO")
+            else:
+                print(f"❌ {step_name}: FALLÓ")
+        except Exception as e:
+            print(f"❌ {step_name}: ERROR - {e}")
+    
+    # Resultados
+    print(f"\n{'='*60}")
+    print("📊 RESULTADOS")
+    print(f"{'='*60}")
+    print(f"✅ Actualizaciones completadas: {success_count}/{len(steps)}")
+    
+    if success_count >= 4:  # Al menos archivos principales actualizados
+        print("\n🎉 ¡DEPENDENCIAS ACTUALIZADAS EXITOSAMENTE!")
+        print("\n🚀 Próximos pasos:")
+        print("   1. pip install -r requirements.txt")
+        print("   2. pip install -e .")
+        print("   3. python quick_test.py")
+        print("\n💡 O usa el script automático:")
+        print("   python install_compatible.py")
+        
+        return True
+    else:
+        print("\n⚠️  ACTUALIZACIONES PARCIALES")
+        print("Revisa los errores arriba")
+        return False
+
+if __name__ == "__main__":
+    try:
+        success = main()
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        print("\n⚠️  Actualización interrumpida")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Error crítico: {e}")
+        sys.exit(1)
