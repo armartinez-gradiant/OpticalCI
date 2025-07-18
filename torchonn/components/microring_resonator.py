@@ -91,33 +91,31 @@ class MicroringResonator(nn.Module):
         # Transmission coefficient
         t = torch.sqrt(1 - kappa**2)
         
-        # ✅ FIX: Convert alpha to tensor
+        # Loss factor from Q factor
         alpha_val = 1 - (np.pi / self.q_factor)
         alpha = torch.tensor(alpha_val, device=self.device, dtype=torch.float32)
         
-        # Transfer function (simplified Lorentzian)
-        denominator = 1 - alpha * t * torch.exp(1j * total_phase)
+        # Transfer function (simplified for stability)
+        # Through port transmission
+        through_transmission = torch.abs(t - alpha * torch.cos(total_phase))**2
         
-        # Through port (transmitted)
-        through_transmission = torch.abs((t - alpha * torch.exp(1j * total_phase)) / denominator)**2
-        
-        # Drop port (coupled)
-        drop_transmission = torch.abs(kappa * torch.sqrt(alpha) / denominator)**2
+        # Drop port transmission  
+        drop_transmission = torch.abs(kappa * torch.sqrt(alpha))**2
         
         return through_transmission, drop_transmission
     
     def apply_nonlinear_effects(self, input_power: torch.Tensor):
         """Aplicar efectos no-lineales (Kerr, TPA)."""
-        # ✅ FIX: Convert constants to tensors
-        tpa_coefficient = torch.tensor(0.8e-11, device=self.device, dtype=torch.float32)  # m/W for silicon
-        kerr_coefficient = torch.tensor(2.7e-18, device=self.device, dtype=torch.float32)  # m²/W for silicon
+        # Simplified nonlinear effects
+        tpa_coefficient = 0.8e-11  # m/W for silicon
+        kerr_coefficient = 2.7e-18  # m²/W for silicon
         
-        # Update internal state
-        self.photon_energy += input_power * 0.1  # Simplified accumulation
+        # Update internal state (simplified)
+        self.photon_energy += input_power * 0.1
         
         # Thermal heating from TPA
         thermal_power = tpa_coefficient * input_power**2
-        self.temperature_shift += thermal_power * 0.01  # Simplified thermal model
+        self.temperature_shift += thermal_power * 0.01
         
         # Phase shift from Kerr effect
         kerr_phase = kerr_coefficient * input_power
@@ -142,8 +140,8 @@ class MicroringResonator(nn.Module):
         input_power = torch.abs(input_signal)**2
         kerr_phase = self.apply_nonlinear_effects(input_power.mean())
         
-        # Ajustar fase por Kerr effect
-        self.phase_shift.data += kerr_phase * 0.1
+        # Ajustar fase por Kerr effect (simplified)
+        self.phase_shift.data += float(kerr_phase) * 0.1
         
         # Calcular transmisión para cada wavelength
         through_trans, drop_trans = self.get_transmission(wavelengths)

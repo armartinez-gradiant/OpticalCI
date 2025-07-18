@@ -5,7 +5,7 @@ Componentes Fotónicos - TorchONN
 
 from .base_component import BasePhotonicComponent, WaveguideComponent, ResonatorComponent
 
-# Imports seguros (solo si el archivo existe y es válido)
+# Imports seguros
 __all__ = ['BasePhotonicComponent', 'WaveguideComponent', 'ResonatorComponent']
 
 def _safe_import(module_name, class_name):
@@ -13,7 +13,8 @@ def _safe_import(module_name, class_name):
     try:
         module = __import__(f'torchonn.components.{module_name}', fromlist=[class_name])
         return getattr(module, class_name)
-    except Exception:
+    except Exception as e:
+        print(f"Warning: Could not import {class_name} from {module_name}: {e}")
         return None
 
 # Intentar imports seguros
@@ -37,10 +38,5 @@ PhaseChangeCell = _safe_import('phase_change_cell', 'PhaseChangeCell')
 if PhaseChangeCell:
     __all__.append('PhaseChangeCell')
 
-Waveguide = _safe_import('waveguide', 'Waveguide')
-if Waveguide:
-    __all__.append('Waveguide')
-
-LaserSource = _safe_import('laser_source', 'LaserSource')
-if LaserSource:
-    __all__.append('LaserSource')
+# Add all successfully imported components
+print(f"TorchONN Components loaded: {__all__}")

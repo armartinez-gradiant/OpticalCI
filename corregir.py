@@ -1,359 +1,156 @@
 #!/usr/bin/env python3
 """
-Script de Corrección de Errores de Sintaxis PtONN-TESTS
-======================================================
+Corrección Directa de Sintaxis PtONN-TESTS
+==========================================
 
-Corrige automáticamente los errores detectados:
-1. Import faltante de MicroringResonator en add_drop_mrr.py
-2. Asteriscos dobles (**) que deben ser dobles underscores (__)
-3. Otros problemas de sintaxis
+Corrección super directa de los errores persistentes de **variable** → __variable__
+que siguen apareciendo en el diagnóstico.
 
-Uso: python fix_syntax_errors.py
+Uso: python direct_syntax_fix.py
 """
 
-import os
-import re
-import shutil
 from pathlib import Path
-from typing import List, Tuple
-from datetime import datetime
 
-class SyntaxFixer:
-    """Corrector automático de errores de sintaxis"""
+def fix_file_directly(file_path: Path, expected_bad_content: str, correct_content: str):
+    """Corregir archivo de forma directa"""
+    if not file_path.exists():
+        print(f"❌ Archivo no encontrado: {file_path}")
+        return False
     
-    def __init__(self, repo_path: str = "."):
-        self.repo_path = Path(repo_path)
-        self.fixes_applied = []
-        
-    def log(self, message: str):
-        """Log de cambios"""
-        print(f"✅ {message}")
-        self.fixes_applied.append(message)
-    
-    def fix_double_asterisks(self, file_path: Path) -> bool:
-        """Corregir ** por __ en variables especiales"""
-        if not file_path.exists():
-            return False
-            
+    try:
+        # Leer contenido actual
         with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+            current_content = f.read()
         
-        original_content = content
-        
-        # Patterns to fix
-        patterns = [
-            (r'\*\*version\*\*', '__version__'),
-            (r'\*\*author\*\*', '__author__'),
-            (r'\*\*all\*\*', '__all__'),
-            (r'\*\*name\*\*', '__name__'),
-            (r'\*\*doc\*\*', '__doc__'),
-            (r'\*\*file\*\*', '__file__'),
-        ]
-        
-        for pattern, replacement in patterns:
-            if re.search(pattern, content):
-                content = re.sub(pattern, replacement, content)
-                self.log(f"Fixed {pattern} → {replacement} in {file_path}")
-        
-        if content != original_content:
+        # Verificar si tiene el contenido problemático
+        if expected_bad_content in current_content:
+            print(f"🔧 Corrigiendo: {file_path}")
+            
+            # Escribir contenido correcto
             with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
+                f.write(correct_content)
+            
+            print(f"✅ Corregido: {file_path}")
             return True
-        
-        return False
-    
-    def fix_add_drop_mrr_import(self) -> bool:
-        """Corregir import faltante en add_drop_mrr.py"""
-        file_path = self.repo_path / "torchonn" / "components" / "add_drop_mrr.py"
-        
-        if not file_path.exists():
-            print(f"⚠️  Archivo no encontrado: {file_path}")
-            return False
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Check if MicroringResonator import is missing
-        if "from .microring_resonator import MicroringResonator" in content:
-            print(f"✅ Import de MicroringResonator ya existe en {file_path}")
-            return False  # Already fixed
-        
-        # Check if MicroringResonator is used but not imported
-        if "MicroringResonator(" in content and "from .microring_resonator import" not in content:
-            # Find the right place to add the import
-            if "from .base_component import BasePhotonicComponent" in content:
-                # Add the import after the base_component import
-                content = content.replace(
-                    "from .base_component import BasePhotonicComponent",
-                    "from .base_component import BasePhotonicComponent\nfrom .microring_resonator import MicroringResonator"
-                )
-            else:
-                # Add after the typing import
-                if "from typing import" in content:
-                    # Find the last typing import
-                    lines = content.split('\n')
-                    insert_index = -1
-                    for i, line in enumerate(lines):
-                        if line.strip().startswith("from typing import") or line.strip().startswith("from .base_component import"):
-                            insert_index = i
-                    
-                    if insert_index >= 0:
-                        lines.insert(insert_index + 1, "from .microring_resonator import MicroringResonator")
-                        content = '\n'.join(lines)
-            
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            
-            self.log(f"Added MicroringResonator import to {file_path}")
-            return True
-        
-        return False
-    
-    def fix_components_init(self) -> bool:
-        """Corregir imports en components/__init__.py"""
-        file_path = self.repo_path / "torchonn" / "components" / "__init__.py"
-        
-        if not file_path.exists():
-            return False
-        
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        # Ensure AddDropMRR import is properly handled
-        if "AddDropMRR = _safe_import('add_drop_mrr', 'AddDropMRR')" in content:
-            return False  # Already handled
-        
-        # Look for the section where imports are done
-        if "_safe_import('add_drop_mrr', 'AddDropMRR')" not in content:
-            # Add import handling for AddDropMRR if missing
-            mrr_import_block = """
-AddDropMRR = _safe_import('add_drop_mrr', 'AddDropMRR')  
-if AddDropMRR:
-    __all__.append('AddDropMRR')
-"""
-            
-            # Insert after MicroringResonator import
-            if "if MicroringResonator:" in content and "__all__.append('MicroringResonator')" in content:
-                content = content.replace(
-                    "if MicroringResonator:\n    __all__.append('MicroringResonator')",
-                    "if MicroringResonator:\n    __all__.append('MicroringResonator')" + mrr_import_block
-                )
-                
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                self.log(f"Fixed AddDropMRR import handling in {file_path}")
-                return True
-        
-        return False
-    
-    def create_backup(self):
-        """Crear backup antes de las correcciones"""
-        backup_path = self.repo_path / f"backup_syntax_fix_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        try:
-            if (self.repo_path / "torchonn").exists():
-                backup_path.mkdir(exist_ok=True)
-                shutil.copytree(
-                    self.repo_path / "torchonn",
-                    backup_path / "torchonn",
-                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc')
-                )
-                print(f"📁 Backup creado en: {backup_path}")
-                return backup_path
-        except Exception as e:
-            print(f"⚠️  No se pudo crear backup: {e}")
-        
-        return None
-    
-    def scan_for_remaining_issues(self):
-        """Buscar problemas restantes"""
-        print("\n🔍 Buscando problemas restantes...")
-        
-        issues_found = []
-        
-        for py_file in self.repo_path.rglob("*.py"):
-            if "__pycache__" in str(py_file):
-                continue
-                
-            try:
-                with open(py_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Check for remaining ** patterns that should be __
-                if re.search(r'\*\*(version|author|all|name|doc|file)\*\*', content):
-                    issues_found.append(f"⚠️  Patrón ** restante en: {py_file}")
-                
-                # Check for common import issues
-                if "MicroringResonator(" in content and "from .microring_resonator import" not in content and "class MicroringResonator" not in content:
-                    issues_found.append(f"⚠️  Uso de MicroringResonator sin import en: {py_file}")
-                    
-            except Exception as e:
-                issues_found.append(f"⚠️  Error leyendo {py_file}: {e}")
-        
-        if issues_found:
-            for issue in issues_found:
-                print(issue)
         else:
-            print("✅ No se encontraron problemas restantes")
-        
-        return issues_found
-    
-    def verify_fixes(self) -> bool:
-        """Verificar que las correcciones funcionan"""
-        print("\n🧪 Verificando correcciones...")
-        
-        try:
-            # Save current working directory
-            original_cwd = os.getcwd()
-            
-            # Change to repo directory for imports
-            os.chdir(self.repo_path)
-            
-            # Try to import the main package
-            import sys
-            if str(self.repo_path) not in sys.path:
-                sys.path.insert(0, str(self.repo_path))
-            
-            try:
-                import torchonn
-                self.log("Import principal funciona")
-                
-                # Check version
-                version = getattr(torchonn, '__version__', None)
-                if version:
-                    self.log(f"Versión detectada: {version}")
-                
-            except Exception as e:
-                print(f"❌ Error importando torchonn: {e}")
-                return False
-            
-            # Try to import layers
-            try:
-                from torchonn.layers import MZILayer, MZIBlockLinear
-                self.log("Import de layers funciona")
-            except ImportError as e:
-                print(f"⚠️  Layers import issue: {e}")
-            
-            # Try to import components if available
-            try:
-                from torchonn.components import BasePhotonicComponent
-                self.log("Import de componentes básicos funciona")
-                
-                # Try more specific imports
-                try:
-                    from torchonn.components import MicroringResonator
-                    self.log("Import de MicroringResonator funciona")
-                except ImportError as e:
-                    print(f"⚠️  MicroringResonator import issue: {e}")
-                
-                try:
-                    from torchonn.components import AddDropMRR
-                    self.log("Import de AddDropMRR funciona")
-                except ImportError as e:
-                    print(f"⚠️  AddDropMRR import issue: {e}")
-                    
-            except ImportError as e:
-                print(f"⚠️  Components import issue: {e}")
-            
-            # Restore working directory
-            os.chdir(original_cwd)
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Error durante verificación: {e}")
-            if 'original_cwd' in locals():
-                os.chdir(original_cwd)
+            print(f"ℹ️ Ya correcto: {file_path}")
             return False
-    
-    def fix_all_files(self) -> List[str]:
-        """Corregir todos los archivos problemáticos"""
-        print("🔧 Iniciando corrección automática de errores...")
-        
-        # Files to check for ** → __ fixes
-        files_to_check = [
-            "torchonn/__init__.py",
-            "torchonn/layers/__init__.py", 
-            "torchonn/models/__init__.py",
-            "torchonn/components/__init__.py",
-            "torchonn/ops/__init__.py",
-            "torchonn/utils/__init__.py",
-            "torchonn/devices/__init__.py",
-        ]
-        
-        # Fix double asterisks in all files
-        for file_path in files_to_check:
-            full_path = self.repo_path / file_path
-            if full_path.exists():
-                self.fix_double_asterisks(full_path)
-            else:
-                print(f"⚠️  Archivo no encontrado: {full_path}")
-        
-        # Fix specific import issues
-        self.fix_add_drop_mrr_import()
-        self.fix_components_init()
-        
-        return self.fixes_applied
-
+            
+    except Exception as e:
+        print(f"❌ Error en {file_path}: {e}")
+        return False
 
 def main():
     """Función principal"""
-    print("🚀 Corrector de Errores de Sintaxis PtONN-TESTS")
-    print("=" * 60)
+    print("🔧 Corrección Directa de Sintaxis - PtONN-TESTS")
+    print("=" * 55)
     
-    # Check if we're in the right directory
-    current_path = Path.cwd()
-    if not (current_path / "torchonn").exists():
-        print("❌ Error: No se encuentra el directorio 'torchonn'")
-        print(f"   Directorio actual: {current_path}")
-        print("   Asegúrate de ejecutar este script desde el directorio raíz del proyecto")
-        return
+    fixes_applied = 0
     
-    fixer = SyntaxFixer(current_path)
+    # Corrección 1: torchonn/__init__.py
+    print("\n1️⃣ Corrigiendo torchonn/__init__.py")
     
-    # Create backup
-    backup_path = fixer.create_backup()
-    
-    # Apply fixes
-    fixes = fixer.fix_all_files()
-    
-    if fixes:
-        print(f"\n✅ Se aplicaron {len(fixes)} correcciones:")
-        for fix in fixes:
-            print(f"  • {fix}")
-    else:
-        print("\n✅ No se encontraron problemas que corregir")
-    
-    # Scan for remaining issues
-    remaining_issues = fixer.scan_for_remaining_issues()
-    
-    # Verify fixes
-    verification_ok = fixer.verify_fixes()
-    
-    print("\n" + "=" * 60)
-    if verification_ok and (fixes or not remaining_issues):
-        print("🎉 ¡Correcciones aplicadas exitosamente!")
-        print("\n📋 Próximos pasos:")
-        print("1. Ejecuta: python quick_test.py")
-        print("2. Verifica: python -c \"from torchonn.components import AddDropMRR; print('✅ OK')\"")
-    elif not fixes and not remaining_issues:
-        print("✅ No había errores que corregir")
-    else:
-        print("⚠️  Hay problemas restantes que requieren atención manual")
-        if remaining_issues:
-            print("\nProblemas detectados:")
-            for issue in remaining_issues[:5]:  # Show first 5
-                print(f"  {issue}")
-        
-    if backup_path:
-        print(f"\n📁 Backup disponible en: {backup_path}")
-    
-    print(f"\n🔍 Comandos para verificar manualmente:")
-    print(f"  cd {current_path}")
-    print("  python -c \"import torchonn; print('✅ Import OK')\"")
-    print("  python -c \"from torchonn.components import AddDropMRR; print('✅ AddDropMRR OK')\"")
+    init_correct = '''"""
+TorchONN - Framework para Redes Neuronales Ópticas
+===================================================
 
+Framework modular y profesional para el diseño, simulación y entrenamiento
+de redes neuronales ópticas (ONNs) basado en PyTorch.
+"""
+
+__version__ = "2.0.0"
+__author__ = "PtONN-TESTS Team"
+
+# Core imports
+from . import layers
+from . import models
+from . import devices
+from . import ops
+from . import utils
+
+# Try to import components
+try:
+    from . import components
+except ImportError:
+    pass
+
+# Key classes
+from .layers import MZILayer, MZIBlockLinear
+from .models import ONNBaseModel
+
+__all__ = [
+    'layers', 'models', 'devices', 'ops', 'utils',
+    'MZILayer', 'MZIBlockLinear', 'ONNBaseModel'
+]
+'''
+    
+    if fix_file_directly(Path("torchonn/__init__.py"), "**version**", init_correct):
+        fixes_applied += 1
+    
+    # Corrección 2: torchonn/layers/__init__.py  
+    print("\n2️⃣ Corrigiendo torchonn/layers/__init__.py")
+    
+    layers_correct = '''"""
+Capas Fotónicas - TorchONN
+=========================
+
+Módulo de capas neuronales fotónicas.
+"""
+
+from .mzi_layer import MZILayer
+from .mzi_block_linear import MZIBlockLinear
+
+__all__ = ['MZILayer', 'MZIBlockLinear']
+
+# Import optional layers
+try:
+    from .mrr_weight_bank import MRRWeightBank
+    __all__.append('MRRWeightBank')
+except ImportError:
+    pass
+
+try:
+    from .photonic_linear import PhotonicLinear
+    __all__.append('PhotonicLinear')
+except ImportError:
+    pass
+
+try:
+    from .photonic_conv2d import PhotonicConv2D
+    __all__.append('PhotonicConv2D')
+except ImportError:
+    pass
+'''
+    
+    if fix_file_directly(Path("torchonn/layers/__init__.py"), "**all**", layers_correct):
+        fixes_applied += 1
+    
+    # Verificación rápida
+    print(f"\n🎯 Resultado: {fixes_applied} archivos corregidos")
+    
+    if fixes_applied > 0:
+        print("\n✅ Correcciones aplicadas")
+        print("📋 Ejecuta ahora: python quick_test.py")
+        
+        # Test rápido de import
+        print("\n🧪 Test rápido de import:")
+        try:
+            import sys
+            sys.path.insert(0, str(Path.cwd()))
+            
+            import torchonn
+            version = getattr(torchonn, '__version__', 'unknown')
+            print(f"✅ TorchONN v{version} importado correctamente")
+            
+            from torchonn.layers import MZILayer
+            print("✅ MZILayer importado correctamente")
+            
+        except Exception as e:
+            print(f"❌ Error en test: {e}")
+    else:
+        print("\nℹ️ No se necesitaron correcciones")
+    
+    return fixes_applied > 0
 
 if __name__ == "__main__":
     main()
