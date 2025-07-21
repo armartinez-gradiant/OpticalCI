@@ -1,1 +1,0 @@
-"""Submódulo simulation.yaml"""

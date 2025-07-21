@@ -10,3 +10,35 @@ dist/
 
 # Editor
 .vscode/
+# Archivos de diagnóstico y temporales
+diagnostic_report.json
+repair_report.json  
+*_report.json
+debug_*.py
+fix_*.py
+*.py.backup
+*.py.bak
+
+# Archivos de coverage y testing temporales
+.coverage
+htmlcov/
+.pytest_cache/
+coverage.xml
+
+# Archivos temporales
+*.tmp
+*.log
+temp_*
+tmp_*
+
+# Modelos temporales
+*.pth
+
+# Backups de seguridad
+safety_backup_*/
+*_backup_*/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

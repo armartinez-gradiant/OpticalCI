@@ -1,1 +1,0 @@
-"""Módulo hardware de TorchONN"""
