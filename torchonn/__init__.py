@@ -1,32 +1,46 @@
 """
-TorchONN - Framework para Redes Neuronales Ópticas
-===================================================
+PtONN-TESTS - A modern, updated PyTorch Library for Photonic Integrated Circuit Simulation
 
-Framework modular y profesional para el diseño, simulación y entrenamiento
-de redes neuronales ópticas (ONNs) basado en PyTorch.
+This is an updated and improved version of pytorch-onn that works with modern PyTorch versions.
 """
 
-__version__ = "2.0.0"
-__author__ = "PtONN-TESTS Team"
+__version__ = "0.1.0"
+__author__ = "Gradiant"
+__email__ = "info@gradiant.org"
 
-# Core imports
-from . import layers
-from . import models
-from . import devices
-from . import ops
-from . import utils
-
-# Try to import components
+# Importar módulos principales
 try:
-    from . import components
-except ImportError:
-    pass
+    from . import layers
+    from . import models
+    from . import devices
+    from . import ops
+except ImportError as e:
+    import warnings
+    warnings.warn(f"Could not import some modules: {e}")
 
-# Key classes
-from .layers import MZILayer, MZIBlockLinear
-from .models import ONNBaseModel
+# Configuración por defecto
+DEFAULT_DEVICE = "cpu"
+DEFAULT_DTYPE = "float32"
 
+def get_version():
+    """Obtener versión del paquete."""
+    return __version__
+
+def get_device():
+    """Obtener dispositivo por defecto."""
+    try:
+        import torch
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    except ImportError:
+        return DEFAULT_DEVICE
+
+# Información del paquete
 __all__ = [
-    'layers', 'models', 'devices', 'ops', 'utils',
-    'MZILayer', 'MZIBlockLinear', 'ONNBaseModel'
+    "layers",
+    "models", 
+    "devices",
+    "ops",
+    "get_version",
+    "get_device",
+    "__version__",
 ]

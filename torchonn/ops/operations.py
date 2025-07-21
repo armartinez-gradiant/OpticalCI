@@ -1,167 +1,141 @@
 """
-Photonic Operations for TorchONN
-===============================
-
-Core operations for photonic neural networks.
+Core operations for PtONN-TESTS
 """
 
 import torch
 import numpy as np
 from typing import Tuple, Optional, Union
 
-
 def matrix_decomposition(
     matrix: torch.Tensor, 
     method: str = "svd"
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Decompose a matrix using various methods.
+    Decompose a matrix using specified method.
     
     Args:
         matrix: Input matrix to decompose
         method: Decomposition method ("svd", "qr", "lu")
-    
+        
     Returns:
-        Decomposed matrices (U, S, V) for SVD or equivalent
+        Tuple of decomposed matrices
     """
     if method == "svd":
         U, S, V = torch.svd(matrix)
         return U, S, V
     elif method == "qr":
         Q, R = torch.qr(matrix)
-        # For compatibility, return Q, diag(R), identity
-        return Q, torch.diag(R), torch.eye(matrix.size(1), device=matrix.device)
+        return Q, R, torch.zeros_like(R)
+    elif method == "lu":
+        # Simplified LU decomposition
+        L = torch.tril(matrix)
+        U = torch.triu(matrix)
+        return L, U, torch.zeros_like(L)
     else:
         raise ValueError(f"Unknown decomposition method: {method}")
 
+def phase_to_unitary(phases: torch.Tensor) -> torch.Tensor:
+    """
+    Convert phases to unitary matrix.
+    
+    Args:
+        phases: Phase values
+        
+    Returns:
+        Unitary matrix
+    """
+    # Simplified implementation
+    n = phases.size(0)
+    unitary = torch.zeros(n, n, dtype=torch.complex64, device=phases.device)
+    
+    for i in range(n):
+        unitary[i, i] = torch.exp(1j * phases[i])
+        
+    return unitary
+
+def unitary_to_phase(unitary: torch.Tensor) -> torch.Tensor:
+    """
+    Extract phases from unitary matrix.
+    
+    Args:
+        unitary: Unitary matrix
+        
+    Returns:
+        Phase values
+    """
+    # Extract diagonal phases
+    diag = torch.diagonal(unitary)
+    phases = torch.angle(diag)
+    return phases
 
 def apply_noise(
-    tensor: torch.Tensor,
-    noise_level: float = 0.1,
+    tensor: torch.Tensor, 
+    noise_level: float = 0.01,
     noise_type: str = "gaussian"
 ) -> torch.Tensor:
     """
-    Apply noise to a tensor.
+    Apply noise to tensor.
     
     Args:
         tensor: Input tensor
-        noise_level: Noise strength (0-1)
+        noise_level: Noise level (0-1)
         noise_type: Type of noise ("gaussian", "uniform")
-    
+        
     Returns:
         Noisy tensor
     """
+    if noise_level <= 0:
+        return tensor
+        
     if noise_type == "gaussian":
         noise = torch.randn_like(tensor) * noise_level
     elif noise_type == "uniform":
         noise = (torch.rand_like(tensor) - 0.5) * 2 * noise_level
     else:
         raise ValueError(f"Unknown noise type: {noise_type}")
-    
+        
     return tensor + noise
 
-
-def compute_transmission(
-    input_field: torch.Tensor,
-    coupling_coefficient: float = 0.5,
-    phase_shift: float = 0.0
+def thermal_phase_shift(
+    phases: torch.Tensor, 
+    temperature: float = 300.0,
+    reference_temp: float = 300.0
 ) -> torch.Tensor:
     """
-    Compute transmission through a photonic element.
+    Apply thermal phase shift.
     
     Args:
-        input_field: Input optical field
-        coupling_coefficient: Coupling strength (0-1)
-        phase_shift: Phase shift in radians
-    
+        phases: Original phases
+        temperature: Current temperature (K)
+        reference_temp: Reference temperature (K)
+        
     Returns:
-        Transmitted field
+        Phase-shifted values
     """
-    transmission = torch.sqrt(1 - coupling_coefficient**2)
-    phase_factor = torch.exp(1j * torch.tensor(phase_shift))
+    # Simplified thermal model
+    thermal_coefficient = 1e-4  # 1/K
+    delta_temp = temperature - reference_temp
+    phase_shift = thermal_coefficient * delta_temp
     
-    # For real tensors, just apply transmission
-    if not torch.is_complex(input_field):
-        return input_field * transmission
-    else:
-        return input_field * transmission * phase_factor
+    return phases + phase_shift
 
-
-def phase_shift(
-    input_field: torch.Tensor,
-    phase: Union[float, torch.Tensor]
-) -> torch.Tensor:
+def validate_unitary(matrix: torch.Tensor, tolerance: float = 1e-6) -> bool:
     """
-    Apply phase shift to optical field.
+    Validate if matrix is approximately unitary.
     
     Args:
-        input_field: Input field
-        phase: Phase shift in radians
-    
+        matrix: Matrix to validate
+        tolerance: Tolerance for validation
+        
     Returns:
-        Phase-shifted field
+        True if matrix is approximately unitary
     """
-    if isinstance(phase, (int, float)):
-        phase = torch.tensor(phase, device=input_field.device)
+    if matrix.size(0) != matrix.size(1):
+        return False
+        
+    # Check if U @ U.H ≈ I
+    identity = torch.eye(matrix.size(0), dtype=matrix.dtype, device=matrix.device)
+    product = torch.mm(matrix, matrix.conj().t())
+    diff = torch.abs(product - identity)
     
-    # For real inputs, convert to complex
-    if not torch.is_complex(input_field):
-        complex_field = input_field.to(torch.complex64)
-    else:
-        complex_field = input_field
-    
-    phase_factor = torch.exp(1j * phase)
-    return complex_field * phase_factor
-
-
-def beam_splitter(
-    input1: torch.Tensor,
-    input2: torch.Tensor,
-    splitting_ratio: float = 0.5
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Simulate a beam splitter.
-    
-    Args:
-        input1: First input beam
-        input2: Second input beam  
-        splitting_ratio: Splitting ratio (0-1)
-    
-    Returns:
-        Two output beams
-    """
-    t = torch.sqrt(1 - splitting_ratio)  # Transmission
-    r = torch.sqrt(splitting_ratio)      # Reflection
-    
-    output1 = t * input1 + r * input2
-    output2 = r * input1 + t * input2
-    
-    return output1, output2
-
-
-def optical_loss(
-    input_field: torch.Tensor,
-    loss_db: float = 0.1
-) -> torch.Tensor:
-    """
-    Apply optical loss.
-    
-    Args:
-        input_field: Input field
-        loss_db: Loss in dB
-    
-    Returns:
-        Attenuated field
-    """
-    loss_linear = 10 ** (-loss_db / 20)
-    return input_field * loss_linear
-
-
-__all__ = [
-    'matrix_decomposition',
-    'apply_noise',
-    'compute_transmission', 
-    'phase_shift',
-    'beam_splitter',
-    'optical_loss'
-]
+    return torch.max(diff) < tolerance

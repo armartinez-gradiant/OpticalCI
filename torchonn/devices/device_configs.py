@@ -1,87 +1,82 @@
 """
-Device Configuration for TorchONN
-=================================
-
-Utilities for device configuration and management.
+Device configurations for PtONN-TESTS
 """
 
 import torch
 from typing import Optional, Union, Dict, Any
 from dataclasses import dataclass
 
-
 @dataclass
 class DeviceConfig:
-    """Configuration for compute devices."""
-    device: torch.device
-    precision: str = "float32"
-    memory_fraction: float = 0.9
+    """Configuration for photonic devices."""
     
-    @property
-    def dtype(self) -> torch.dtype:
-        """Get PyTorch dtype from precision string."""
-        if self.precision == "float32":
-            return torch.float32
-        elif self.precision == "float64":
-            return torch.float64
-        elif self.precision == "float16":
-            return torch.float16
-        else:
-            return torch.float32
+    device: torch.device
+    dtype: torch.dtype = torch.float32
+    precision: str = "single"  # "single", "double", "half"
+    noise_level: float = 0.0
+    temperature: float = 300.0  # Kelvin
+    
+    def __post_init__(self):
+        """Validate configuration after initialization."""
+        if self.precision not in ["single", "double", "half"]:
+            raise ValueError("precision must be 'single', 'double', or 'half'")
+        if self.noise_level < 0:
+            raise ValueError("noise_level must be non-negative")
+        if self.temperature < 0:
+            raise ValueError("temperature must be positive")
+            
+    @classmethod
+    def from_device(cls, device: Union[str, torch.device], **kwargs) -> "DeviceConfig":
+        """Create configuration from device."""
+        if isinstance(device, str):
+            device = torch.device(device)
+        return cls(device=device, **kwargs)
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "device": str(self.device),
+            "dtype": str(self.dtype),
+            "precision": self.precision,
+            "noise_level": self.noise_level,
+            "temperature": self.temperature,
+        }
 
+# Global default device configuration
+_default_device_config: Optional[DeviceConfig] = None
 
 def get_default_device() -> DeviceConfig:
     """Get default device configuration."""
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        precision = "float32"
-    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        device = torch.device("mps")
-        precision = "float32"
-    else:
-        device = torch.device("cpu")
-        precision = "float32"
-    
-    return DeviceConfig(device=device, precision=precision)
+    global _default_device_config
+    if _default_device_config is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        _default_device_config = DeviceConfig(device=device)
+    return _default_device_config
 
-
-def set_device_config(device: Union[str, torch.device], precision: str = "float32") -> DeviceConfig:
-    """Set specific device configuration."""
-    if isinstance(device, str):
-        device = torch.device(device)
-    
-    return DeviceConfig(device=device, precision=precision)
-
+def set_default_device(config: Union[DeviceConfig, str, torch.device]) -> None:
+    """Set default device configuration."""
+    global _default_device_config
+    if isinstance(config, (str, torch.device)):
+        config = DeviceConfig.from_device(config)
+    _default_device_config = config
 
 def get_device_info() -> Dict[str, Any]:
     """Get information about available devices."""
     info = {
         "cuda_available": torch.cuda.is_available(),
         "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
-        "mps_available": hasattr(torch.backends, 'mps') and torch.backends.mps.is_available(),
-        "cpu_count": torch.get_num_threads(),
+        "mps_available": torch.backends.mps.is_available(),
+        "current_device": str(get_default_device().device),
     }
     
     if torch.cuda.is_available():
-        info["cuda_devices"] = []
-        for i in range(torch.cuda.device_count()):
-            info["cuda_devices"].append({
+        info["cuda_devices"] = [
+            {
                 "index": i,
                 "name": torch.cuda.get_device_name(i),
-                "capability": torch.cuda.get_device_capability(i),
-                "memory_total": torch.cuda.get_device_properties(i).total_memory,
-            })
+                "memory": torch.cuda.get_device_properties(i).total_memory,
+            }
+            for i in range(torch.cuda.device_count())
+        ]
     
     return info
-
-
-# Default device configuration
-DEFAULT_DEVICE_CONFIG = get_default_device()
-
-__all__ = [
-    'DeviceConfig',
-    'get_default_device', 
-    'set_device_config',
-    'get_device_info',
-    'DEFAULT_DEVICE_CONFIG'
-]
