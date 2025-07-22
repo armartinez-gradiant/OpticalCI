@@ -49,8 +49,7 @@ class MicroringResonator(nn.Module):
         if fsr is None:
             n_group = 4.2  # Group index for silicon
             circumference = 2 * np.pi * radius
-            # FSR = λ²/(n_g * L) - CORREGIDO
-            self.fsr = (center_wavelength**2) / (n_group * circumference)
+            self.fsr = center_wavelength**2 / (n_group * circumference)
         else:
             self.fsr = fsr
         
@@ -61,72 +60,60 @@ class MicroringResonator(nn.Module):
         # Estado interno (para efectos no-lineales)
         self.register_buffer('photon_energy', torch.zeros(1, device=device))
         self.register_buffer('temperature_shift', torch.zeros(1, device=device))
-    def print_debug_info(self):
-        """Imprimir información de debug del microring."""
-        print(f"Debug Microring:")
-        print(f"  Radius: {self.radius*1e6:.1f} μm")
-        print(f"  Coupling: {self.coupling_strength:.3f}")
-        print(f"  Q factor: {self.q_factor}")
-        print(f"  Center wavelength: {self.center_wavelength*1e9:.1f} nm")
-        print(f"  FSR: {self.fsr*1e12:.1f} pm")
-        print(f"  Expected ER: ~{10*np.log10(4*self.q_factor*self.coupling_strength**2):.1f} dB")
-
     
     def get_transmission(self, wavelengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Calcular transmisión - ECUACIONES FÍSICAS CORRECTAS.
+        Calcular transmisión en through y drop ports - CORREGIDO.
+        
+        Args:
+            wavelengths: Tensor de wavelengths [n_wavelengths]
+            
+        Returns:
+            through_transmission, drop_transmission
         """
-        # Thermal shift
+        # Detuning from resonance
         thermal_shift = self.temperature_shift * self.thermal_coefficient
         effective_wavelength = self.center_wavelength + thermal_shift
         
-        # Normalized frequency detuning
+        # 🔧 CORRECCIÓN 1: Detuning normalizado correcto
         delta_lambda = wavelengths - effective_wavelength
-        delta_omega_norm = 2 * np.pi * delta_lambda / self.fsr
         
-        # Total phase including tuning
-        total_phase = delta_omega_norm + self.phase_shift
+        # 🔧 CORRECCIÓN 2: Phase per round trip más preciso
+        delta_phi = 2 * np.pi * delta_lambda / self.fsr
+        total_phase = delta_phi + self.phase_shift
         
-        # Coupling parameters
-        kappa = torch.clamp(self.coupling_tuning, 0.01, 0.99)
-        t = torch.sqrt(1 - kappa**2)  # Transmission coefficient
+        # 🔧 CORRECCIÓN 3: Coupling coefficient realista
+        kappa = torch.clamp(self.coupling_tuning, 0.05, 0.95)
+        t = torch.sqrt(1 - kappa**2)
         
-        # Loss parameter from Q factor
-        # For power: loss_per_round_trip = 2π/Q
-        # For amplitude: α = exp(-π/Q)
-        alpha = torch.exp(torch.tensor(-np.pi / self.q_factor, 
+        # 🔧 CORRECCIÓN 4: Loss factor correcto del Q factor
+        alpha = torch.exp(torch.tensor(-np.pi / (2 * self.q_factor), 
                                      device=self.device, dtype=torch.float32))
         
-        # Complex exponential
-        exp_phase = torch.cos(total_phase) + 1j * torch.sin(total_phase)
+        # 🔧 CORRECCIÓN 5: Ecuaciones de transferencia correctas
+        exp_phi = torch.cos(total_phase) + 1j * torch.sin(total_phase)
         
-        # Standard microring transfer functions
-        # Through port: H_t = (t - α*exp(jφ)) / (1 - α*t*exp(jφ))
-        # Drop port: H_d = jκ√α / (1 - α*t*exp(jφ))
+        # Denominador común
+        denominator = 1 - alpha * t * exp_phi
         
-        denominator = 1 - alpha * t * exp_phase
-        
-        # Through port
-        through_complex = (t - alpha * exp_phase) / denominator
+        # Through port transfer function
+        through_numerator = t - alpha * exp_phi
+        through_complex = through_numerator / denominator
         through_transmission = torch.abs(through_complex)**2
         
-        # Drop port
-        drop_complex = (1j * kappa * torch.sqrt(alpha)) / denominator
+        # Drop port transfer function  
+        drop_numerator = 1j * kappa * torch.sqrt(alpha)
+        drop_complex = drop_numerator / denominator
         drop_transmission = torch.abs(drop_complex)**2
         
-        # Energy conservation check
-        total_transmission = through_transmission + drop_transmission
+        # 🔧 CORRECCIÓN 6: Garantizar conservación de energía
+        total_power = through_transmission + drop_transmission
+        max_power = torch.max(total_power)
         
-        # Add loss term for energy balance
-        loss_transmission = 1 - alpha**2  # Round-trip loss
-        theoretical_total = total_transmission + loss_transmission
-        
-        # Normalize if over unity (should not happen with correct physics)
-        max_total = torch.max(total_transmission)
-        if max_total > 1.0:
-            factor = 1.0 / max_total
-            through_transmission *= factor
-            drop_transmission *= factor
+        if max_power > 1.01:
+            normalization = 1.0 / max_power
+            through_transmission *= normalization
+            drop_transmission *= normalization
         
         return through_transmission, drop_transmission
     

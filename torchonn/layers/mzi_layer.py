@@ -206,11 +206,7 @@ class MZILayer(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass con física MZI real.
-        
-        🔧 CORRECCIÓN PRINCIPAL:
-        ❌ ANTES: return torch.mm(x, self.weight.t())
-        ✅ AHORA: Usar matriz unitaria construida físicamente
+        Forward pass con física MZI real - CONSERVACIÓN DE ENERGÍA CORREGIDA.
         """
         batch_size = x.size(0)
         
@@ -231,13 +227,12 @@ class MZILayer(nn.Module):
         # CONSTRUCCIÓN DE MATRIZ UNITARIA FÍSICA
         U = self._construct_unitary_matrix()
         
-        # Validar unitarity (crítico para conservación de energía)
-        if self.training and torch.rand(1).item() < 0.1:  # 10% de las veces en training
+        # Validar unitarity ocasionalmente
+        if self.training and torch.rand(1).item() < 0.1:
             self.validate_unitarity(U)
         
         # Preparar input para multiplicación
         if self.in_features != self.matrix_dim:
-            # Pad si necesario
             if x.size(1) < self.matrix_dim:
                 padding = torch.zeros(batch_size, self.matrix_dim - x.size(1), 
                                     device=x.device, dtype=x.dtype)
@@ -247,34 +242,36 @@ class MZILayer(nn.Module):
         else:
             x_padded = x
         
-        # Convertir a complex para multiplicación unitaria
+        # 🔧 CORRECCIÓN CRÍTICA: Manejo apropiado de números complejos
         x_complex = x_padded.to(dtype=torch.complex64)
         
-        # APLICAR TRANSFORMACIÓN UNITARIA (FÍSICA REAL)
+        # APLICAR TRANSFORMACIÓN UNITARIA
         output_complex = torch.matmul(x_complex, U.t().conj())
         
-        # Convertir de vuelta a real (tomar magnitud)
-        if x.dtype.is_floating_point:
-            output = torch.real(output_complex)
+        # 🔧 CORRECCIÓN PRINCIPAL: Conservación de energía
+        if torch.is_complex(x):
+            output = output_complex
         else:
-            output = torch.abs(output_complex)  # Magnitud para detección incoherente
+            # Para conservar energía: usar magnitud que preserva |Ux|² = |x|²
+            output = torch.abs(output_complex)
         
-        # Truncar a dimensión de salida si necesario
+        # Truncar a dimensión de salida
         if output.size(1) != self.out_features:
             output = output[:, :self.out_features]
         
         # Conversión final a dtype original
         output = output.to(dtype=self.dtype)
         
-        # VALIDACIÓN DE CONSERVACIÓN DE ENERGÍA
+        # VALIDACIÓN MEJORADA: Conservación de energía
         if self.training:
-            input_power = torch.sum(torch.abs(x_padded)**2).item()
-            output_power = torch.sum(torch.abs(output)**2).item()
+            input_energy = torch.sum(torch.abs(x_padded)**2)
+            output_energy = torch.sum(torch.abs(output)**2)
             
-            if input_power > 1e-10:  # Evitar división por cero
-                power_ratio = output_power / input_power
-                if abs(power_ratio - 1.0) > 0.1:  # 10% tolerancia
-                    warnings.warn(f"Energy conservation issue: {power_ratio:.3f} (should be ≈1.0)")
+            if input_energy > 1e-10:
+                energy_ratio = output_energy / input_energy
+                if abs(energy_ratio - 1.0) > 0.05:
+                    warnings.warn(f"MZI energy conservation: {energy_ratio:.3f} "
+                                f"(should be ≈1.0 for unitary matrices)")
         
         return output
     

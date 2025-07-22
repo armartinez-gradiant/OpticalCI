@@ -90,8 +90,8 @@ class PhotonicSimulationDemo:
         # Crear microring con parámetros específicos
         mrr = MicroringResonator(
             radius=10e-6,           # 10 μm radius
-            coupling_strength=0.15,  # 30% coupling
-            q_factor=25000,         # Q = 15,000
+            coupling_strength=0.3,  # 30% coupling
+            q_factor=15000,         # Q = 15,000
             center_wavelength=1550e-9,  # 1550 nm
             device=self.device
         )
@@ -120,17 +120,7 @@ class PhotonicSimulationDemo:
         resonance_wavelength = wavelengths[min_idx]
         
         # Calcular métricas
-        # Buscar máximo lejos de resonancia para extinction ratio correcto
-        resonance_region = torch.abs(wavelengths - resonance_wavelength) < 1e-9  # ±1nm
-        off_resonance_mask = ~resonance_region
-        
-        if torch.sum(off_resonance_mask) > 0:
-            max_transmission = torch.max(through_response[off_resonance_mask])
-        else:
-            max_transmission = torch.max(through_response)
-        
-        min_transmission = torch.clamp(through_response[min_idx], min=1e-10)
-        extinction_ratio = max_transmission / min_transmission
+        extinction_ratio = torch.max(through_response) / through_response[min_idx]
         extinction_ratio_db = 10 * torch.log10(extinction_ratio)
         
         # FSR teórico vs medido
@@ -144,45 +134,18 @@ class PhotonicSimulationDemo:
             wide_output = mrr(wide_input, wide_wavelengths)
             wide_through = wide_output['through'][0]
         
-        # Encontrar mínimos locales para FSR
+        # Encontrar mínimos locales
         minima_indices = []
-        threshold = torch.max(wide_through) * 0.3  # 30% threshold
-        
-        # Buscar mínimos con mejor algoritmo
-        for i in range(10, len(wide_through)-10):
-            is_minimum = True
-            # Verificar que es menor que vecinos en ventana de ±5 puntos
-            for j in range(i-5, i+6):
-                if j != i and wide_through[j] < wide_through[i]:
-                    is_minimum = False
-                    break
-            
-            if is_minimum and wide_through[i] < threshold:
-                # Verificar que no hay otro mínimo muy cerca
-                too_close = False
-                for existing_idx in minima_indices:
-                    if abs(i - existing_idx) < 20:  # Mínimo 20 puntos de separación
-                        too_close = True
-                        break
-                if not too_close:
-                    minima_indices.append(i)
-        
-        print(f"   Resonancias detectadas: {len(minima_indices)}")
+        for i in range(1, len(wide_through)-1):
+            if (wide_through[i] < wide_through[i-1] and 
+                wide_through[i] < wide_through[i+1] and
+                wide_through[i] < 0.5):  # Threshold for resonance
+                minima_indices.append(i)
         
         if len(minima_indices) >= 2:
-            # Calcular FSR promedio de múltiples pares
-            fsr_measurements = []
-            for i in range(len(minima_indices)-1):
-                spacing = wide_wavelengths[minima_indices[i+1]] - wide_wavelengths[minima_indices[i]]
-                fsr_measurements.append(spacing.item())
-            
-            if fsr_measurements:
-                fsr_measured_val = sum(fsr_measurements) / len(fsr_measurements)
-                fsr_measured = torch.tensor(fsr_measured_val, device=self.device)
-            else:
-                fsr_measured = torch.tensor(fsr_theoretical, device=self.device)
+            fsr_measured = wide_wavelengths[minima_indices[1]] - wide_wavelengths[minima_indices[0]]
         else:
-            fsr_measured = torch.tensor(fsr_theoretical, device=self.device)
+            fsr_measured = torch.tensor(fsr_theoretical, device=self.device)  # Convert to tensor
         
         print(f"📊 Resultados Microring:")
         print(f"   Wavelength central: {resonance_wavelength*1e9:.3f} nm")
