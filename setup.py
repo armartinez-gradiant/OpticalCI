@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ptonn-tests",
-    version="0.1.0",
+    version="1.0.0",
     description="A modern PyTorch Library for Photonic Computing",
     packages=find_packages(),
     install_requires=[
