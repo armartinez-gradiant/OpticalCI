@@ -1,9 +1,0 @@
-model:
-  type: MZI_CLASS_CNN
-  params:
-    in_channels: 1
-    hidden_sizes: [32, 64]
-    num_classes: 10
-data:
-  dataset: MNIST
-  root: data/ 
