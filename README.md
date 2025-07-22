@@ -1,4 +1,4 @@
-# PtONN-TESTS
+# OpticalCI
 
 **A modern PyTorch library for photonic neural network simulation**
 
@@ -6,7 +6,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-yellow.svg)](#license)
 
-PtONN-TESTS is a modernized PyTorch library for simulating photonic integrated circuits and optical neural networks. It provides physically-accurate models of photonic components like Mach-Zehnder interferometers, microring resonators, and wavelength division multiplexing systems.
+OpticalCI is a modernized PyTorch library for simulating photonic integrated circuits and optical neural networks. It provides physically-accurate models of photonic components like Mach-Zehnder interferometers, microring resonators, and wavelength division multiplexing systems.
 
 ## Features
 
@@ -21,8 +21,8 @@ PtONN-TESTS is a modernized PyTorch library for simulating photonic integrated c
 ### Installation
 
 ```bash
-git clone https://github.com/armartinez-gradiant/PtONN-TESTS.git
-cd PtONN-TESTS
+git clone https://github.com/armartinez-gradiant/OpticalCI.git
+cd OpticalCI
 pip install -e .
 ```
 
@@ -192,8 +192,8 @@ Contributions are welcome! Please follow these steps:
 ### Development Setup
 
 ```bash
-git clone https://github.com/anxo-rodriguez/PtONN-TESTS.git
-cd PtONN-TESTS
+git clone https://github.com/armartinez-gradiant/OpticalCI.git
+cd OpticalCI
 pip install -e .
 pip install -r requirements-dev.txt
 ```
@@ -227,14 +227,14 @@ For licensing inquiries, contact: armartinez@gradiant.org
 
 ## Citation
 
-If you use PtONN-TESTS in your research, please cite:
+If you use OpticalCI in your research, please cite:
 
 ```bibtex
-@software{rodriguez2025ptonn,
-  title={PtONN-TESTS: A Modern PyTorch Library for Photonic Neural Networks},
+@software{rodriguez2025OpticalCI,
+  title={OpticalCI: A Modern PyTorch Library for Photonic Neural Networks},
   author={Anxo Rodríguez Martínez},
   year={2025},
-  url={https://github.com/anxo-rodriguez/PtONN-TESTS}
+  url={https://github.com/armartinez-gradiant/OpticalCI}
 }
 ```
 
