@@ -21,7 +21,7 @@ PtONN-TESTS is a modernized PyTorch library for simulating photonic integrated c
 ### Installation
 
 ```bash
-git clone https://github.com/anxo-rodriguez/PtONN-TESTS.git
+git clone https://github.com/armartinez-gradiant/PtONN-TESTS.git
 cd PtONN-TESTS
 pip install -e .
 ```
