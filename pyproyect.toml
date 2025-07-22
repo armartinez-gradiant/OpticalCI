@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.8,<3.13"
 license = {text = "MIT"}
 authors = [
-    {name = "Gradiant Technology Center", email = "info@gradiant.org"},
+    {name = "Anxo Rodríguez Martínez", email = "info@Anxo Rodríguez Martínez.org"},
 ]
 maintainers = [
-    {name = "Gradiant Technology Center", email = "info@gradiant.org"},
+    {name = "Anxo Rodríguez Martínez", email = "info@Anxo Rodríguez Martínez.org"},
 ]
 keywords = [
     "pytorch",
@@ -32,7 +32,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Education",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Proprietary License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -57,12 +57,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/armartinez-gradiant/PtONN-TESTS"
-Repository = "https://github.com/armartinez-gradiant/PtONN-TESTS"
-Documentation = "https://github.com/armartinez-gradiant/PtONN-TESTS/wiki"
-"Bug Tracker" = "https://github.com/armartinez-gradiant/PtONN-TESTS/issues"
-Changelog = "https://github.com/armartinez-gradiant/PtONN-TESTS/blob/main/CHANGELOG.md"
-Funding = "https://www.gradiant.org/"
+Homepage = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS"
+Repository = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS"
+Documentation = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS/wiki"
+"Bug Tracker" = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS/issues"
+Changelog = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS/blob/main/CHANGELOG.md"
+Funding = "https://www.Anxo Rodríguez Martínez.org/"
 
 [project.optional-dependencies]
 dev = [

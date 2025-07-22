@@ -4,9 +4,9 @@ PtONN-TESTS - A modern, updated PyTorch Library for Photonic Integrated Circuit 
 This is an updated and improved version of pytorch-onn that works with modern PyTorch versions.
 """
 
-__version__ = "0.1.0"
-__author__ = "Gradiant"
-__email__ = "info@gradiant.org"
+__version__ = "1.0.0"
+__author__ = "Anxo Rodríguez Martínez"
+__email__ = "anxo.martinez@email.com"
 
 # Importar módulos principales
 try:
