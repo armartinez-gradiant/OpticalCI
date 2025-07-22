@@ -206,7 +206,7 @@ pip install -r requirements-dev.txt
 - Visualization tools
 - Tutorial notebooks
 
-**Version 0.3.0**
+**Version 1.1.0**
 - Complete nonlinear optics suite
 - Hardware integration
 - Performance optimizations
@@ -221,7 +221,6 @@ For licensing inquiries, contact: armartinez@gradiant.org
 
 **Anxo Rodríguez Martínez**
 
-Photonic computing researcher and software engineer specializing in optical neural networks and machine learning.
 
 - Email: armartinez@gradiant.org
 - GitHub: [@armartinez-gradiant]
