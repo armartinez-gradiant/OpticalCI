@@ -11,7 +11,7 @@ import numpy as np
 from typing import List, Tuple, Optional, Dict, Union
 import math
 import warnings
-
+ 
 class PhaseChangeCell(nn.Module):
     """
     Phase Change Material Cell - Para pesos reconfigurables no-volátiles.

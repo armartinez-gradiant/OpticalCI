@@ -154,6 +154,6 @@ class MZIBlockLinear(nn.Module):
         
         return output
         
-    def extra_repr(self) -> str:
+    def extra_repr(self) -> str: 
         """Representación extra para debugging."""
         return f"in_features={self.in_features}, out_features={self.out_features}, miniblock={self.miniblock}, mode={self.mode}"

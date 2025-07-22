@@ -3,7 +3,7 @@ Detector Components for PtONN-TESTS
 
 Implementation of photodetectors and optical-to-electrical
 conversion components for photonic neural networks.
-"""
+""" 
 
 import torch
 import torch.nn as nn

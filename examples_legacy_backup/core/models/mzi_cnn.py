@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import torchonn as onn
-
+ 
 class MZI_CLASS_CNN(nn.Module):
     def __init__(self, in_channels=1, hidden_sizes=[32,64], num_classes=10, device=None):
         super().__init__()

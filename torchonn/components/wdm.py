@@ -11,7 +11,7 @@ import numpy as np
 from typing import List, Tuple, Optional, Dict, Union
 import math
 import warnings
-
+ 
 # Import MicroringResonator from layers
 from torchonn.layers.microring import MicroringResonator
 

@@ -63,7 +63,7 @@ Documentation = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-T
 "Bug Tracker" = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS/issues"
 Changelog = "https://github.com/armartinez-Anxo Rodríguez Martínez/PtONN-TESTS/blob/main/CHANGELOG.md"
 Funding = "https://www.Anxo Rodríguez Martínez.org/"
-
+ 
 [project.optional-dependencies]
 dev = [
     "pytest>=6.0.0,<8.0.0",

@@ -2,7 +2,7 @@
 Operations module for PtONN-TESTS
 
 Basic operations for photonic computing.
-"""
+""" 
 
 from .operations import (
     matrix_decomposition,

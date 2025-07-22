@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-🌟 Ejemplo Actualizado: Componentes Fotónicos - PtONN-TESTS
+Ejemplo Actualizado: Componentes Fotónicos - PtONN-TESTS
 
 Demostración de uso de los componentes fotónicos migrados a la estructura principal.
-"""
+""" 
 
 import torch
 from torchonn.layers import (

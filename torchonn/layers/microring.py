@@ -3,7 +3,7 @@ Microring Photonic Components for PtONN-TESTS
 
 Implementation of microring resonators and related components
 for photonic neural network simulation.
-"""
+""" 
 
 import torch
 import torch.nn as nn

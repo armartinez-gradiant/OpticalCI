@@ -6,4 +6,4 @@ model:
     num_classes: 10
 data:
   dataset: MNIST
-  root: data/
+  root: data/ 

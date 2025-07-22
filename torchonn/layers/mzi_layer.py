@@ -52,7 +52,7 @@ class MZILayer(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         
-        # Usar dimensión máxima para matriz unitaria
+        # Usar dimensión máxima para matriz unitaria 
         self.matrix_dim = max(in_features, out_features)
         
         # Device y dtype setup

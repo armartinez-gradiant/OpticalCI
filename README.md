@@ -240,4 +240,4 @@ If you use PtONN-TESTS in your research, please cite:
 
 ## Acknowledgments
 
-This project builds upon research in photonic computing and neural networks. Special thanks to the PyTorch team for providing the foundational framework.
+This project builds upon research in photonic computing and neural networks. Special thanks to the PyTorch team for providing the foundational framework. 
