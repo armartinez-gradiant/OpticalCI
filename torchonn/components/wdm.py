@@ -12,6 +12,9 @@ from typing import List, Tuple, Optional, Dict, Union
 import math
 import warnings
 
+# Import MicroringResonator from layers
+from torchonn.layers.microring import MicroringResonator
+
 class WDMMultiplexer(nn.Module):
     """
     WDM Multiplexer/Demultiplexer - Para sistemas multicanal.
@@ -47,15 +50,7 @@ class WDMMultiplexer(nn.Module):
         print(f"🌈 WDM Multiplexer: {self.n_channels} canales")
     
     def multiplex(self, channel_signals: List[torch.Tensor]) -> torch.Tensor:
-        """
-        Multiplexar múltiples canales en una sola fibra.
-        
-        Args:
-            channel_signals: Lista de [batch_size] por canal
-            
-        Returns:
-            multiplexed_signal: [batch_size, n_wavelengths]
-        """
+        """Multiplexar múltiples canales en una sola fibra."""
         if len(channel_signals) != self.n_channels:
             raise ValueError(f"Expected {self.n_channels} channels, got {len(channel_signals)}")
         
@@ -69,15 +64,7 @@ class WDMMultiplexer(nn.Module):
         return multiplexed
     
     def demultiplex(self, multiplexed_signal: torch.Tensor) -> List[torch.Tensor]:
-        """
-        Demultiplexar señal WDM en canales individuales.
-        
-        Args:
-            multiplexed_signal: [batch_size, n_wavelengths]
-            
-        Returns:
-            channel_signals: Lista de [batch_size] por canal
-        """
+        """Demultiplexar señal WDM en canales individuales."""
         channel_signals = []
         through_signal = multiplexed_signal.clone()
         
@@ -93,125 +80,6 @@ class WDMMultiplexer(nn.Module):
             through_signal = filter_output['through']
         
         return channel_signals
-
-def test_advanced_components():
-    """Test de todos los componentes avanzados."""
-    print("🧪 Test: Componentes Fotónicos Avanzados")
-    print("=" * 60)
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    batch_size = 4
-    n_wavelengths = 8
-    
-    # Wavelengths de prueba
-    wavelengths = torch.linspace(1530e-9, 1570e-9, n_wavelengths, device=device)
-    
-    print("1️⃣ Microring Resonator:")
-    mrr = MicroringResonator(device=device)
-    input_signal = torch.randn(batch_size, n_wavelengths, device=device)
-    mrr_output = mrr(input_signal, wavelengths)
-    print(f"   Input: {input_signal.shape}")
-    print(f"   Through: {mrr_output['through'].shape}")
-    print(f"   Drop: {mrr_output['drop'].shape}")
-    
-    print("\n2️⃣ Add-Drop MRR:")
-    add_drop = AddDropMRR(device=device)
-    add_signal = torch.randn(batch_size, n_wavelengths, device=device)
-    add_drop_output = add_drop(input_signal, add_signal, wavelengths)
-    print(f"   Through: {add_drop_output['through'].shape}")
-    print(f"   Drop: {add_drop_output['drop'].shape}")
-    
-    print("\n3️⃣ MRR Weight Bank:")
-    weight_bank = MRRWeightBank(n_inputs=4, n_outputs=3, n_wavelengths=n_wavelengths, device=device)
-    bank_input = torch.randn(batch_size, 4, n_wavelengths, device=device)
-    bank_output = weight_bank(bank_input)
-    print(f"   Input: {bank_input.shape}")
-    print(f"   Output: {bank_output.shape}")
-    weight_matrix = weight_bank.get_weight_matrix()
-    print(f"   Weight matrix: {weight_matrix.shape}")
-    
-    print("\n4️⃣ Directional Coupler:")
-    coupler = DirectionalCoupler(device=device)
-    input_1 = torch.randn(batch_size, n_wavelengths, device=device)
-    input_2 = torch.randn(batch_size, n_wavelengths, device=device)
-    out_1, out_2 = coupler(input_1, input_2)
-    print(f"   Input: {input_1.shape}, {input_2.shape}")
-    print(f"   Output: {out_1.shape}, {out_2.shape}")
-    
-    print("\n5️⃣ Photodetector:")
-    photodet = Photodetector(device=device)
-    optical_in = torch.randn(batch_size, n_wavelengths, device=device)
-    current_out = photodet(optical_in)
-    print(f"   Optical in: {optical_in.shape}")
-    print(f"   Current out: {current_out.shape}")
-    
-    print("\n6️⃣ PCM Cell:")
-    pcm = PhaseChangeCell(device=device)
-    pcm_input = torch.randn(batch_size, n_wavelengths, device=device)
-    pcm_output = pcm(pcm_input)
-    print(f"   PCM state: {pcm.pcm_state.item():.3f}")
-    print(f"   Output: {pcm_output.shape}")
-    
-    print("\n7️⃣ WDM Multiplexer:")
-    wdm_wavelengths = [1530e-9, 1540e-9, 1550e-9, 1560e-9]
-    wdm = WDMMultiplexer(wdm_wavelengths, device=device)
-    
-    # Test multiplexing
-    channels = [torch.randn(batch_size, device=device) for _ in range(4)]
-    muxed = wdm.multiplex(channels)
-    print(f"   Channels: {len(channels)} x {channels[0].shape}")
-    print(f"   Multiplexed: {muxed.shape}")
-    
-    # Test demultiplexing
-    demuxed = wdm.demultiplex(muxed)
-    print(f"   Demultiplexed: {len(demuxed)} channels")
-    
-    print("\n✅ Todos los componentes avanzados funcionando correctamente!")
-    
-    return {
-        'mrr': mrr,
-        'add_drop': add_drop,
-        'weight_bank': weight_bank,
-        'coupler': coupler,
-        'photodetector': photodet,
-        'pcm': pcm,
-        'wdm': wdm
-    }
-
-def main():
-    """Función principal de demostración."""
-    print("🌟 Componentes Fotónicos Avanzados - PtONN-TESTS Enhanced")
-    print("=" * 80)
-    
-    try:
-        components = test_advanced_components()
-        
-        print(f"\n📋 Componentes Implementados:")
-        print(f"   ✅ Microring Resonator (MRR)")
-        print(f"   ✅ Add-Drop MRR")
-        print(f"   ✅ MRR Weight Bank")
-        print(f"   ✅ Directional Coupler")
-        print(f"   ✅ Photodetector")
-        print(f"   ✅ Phase Change Material (PCM)")
-        print(f"   ✅ WDM Multiplexer/Demultiplexer")
-        
-        print(f"\n🔬 Características Implementadas:")
-        print(f"   🎯 Resonancia wavelength-selective")
-        print(f"   ⚡ Efectos no-lineales (Kerr, TPA)")
-        print(f"   🌡️  Thermal tuning")
-        print(f"   🔧 Parámetros entrenables")
-        print(f"   🌈 WDM completo")
-        print(f"   💾 Memoria no-volátil (PCM)")
-        print(f"   📏 Conversión O/E realista")
-        
-        print(f"\n🚀 Para usar: python advanced_photonic_components.py")
-        
-    except Exception as e:
-        print(f"\n❌ Error durante test: {e}")
-        raise
-
-if __name__ == "__main__":
-    main()
 
 class MRRWeightBank(nn.Module):
     """
@@ -279,15 +147,7 @@ class MRRWeightBank(nn.Module):
         return weight_matrix
     
     def forward(self, input_signals: torch.Tensor) -> torch.Tensor:
-        """
-        Matrix-vector multiplication usando MRR weight bank.
-        
-        Args:
-            input_signals: [batch_size, n_inputs, n_wavelengths]
-            
-        Returns:
-            output_signals: [batch_size, n_outputs, n_wavelengths]
-        """
+        """Matrix-vector multiplication usando MRR weight bank."""
         batch_size = input_signals.size(0)
         output_signals = torch.zeros(batch_size, self.n_outputs, self.n_wavelengths, device=self.device)
         
