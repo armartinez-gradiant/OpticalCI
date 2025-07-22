@@ -1,3 +1,15 @@
+
+# ========================================
+# MIGRACIÓN REQUERIDA:
+# Los componentes fotónicos han sido movidos:
+# 
+# ANTES:
+# from advanced_photonic_components import MicroringResonator, AddDropMRR
+# 
+# DESPUÉS:
+# from torchonn.layers import MicroringResonator, AddDropMRR, DirectionalCoupler, Photodetector
+# from torchonn.components import PhaseChangeCell, WDMMultiplexer, MRRWeightBank
+# ========================================
 #!/usr/bin/env python3
 """
 Componentes Fotónicos Avanzados para PtONN-TESTS

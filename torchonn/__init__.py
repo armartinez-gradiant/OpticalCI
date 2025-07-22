@@ -14,6 +14,7 @@ try:
     from . import models
     from . import devices
     from . import ops
+    from . import components
 except ImportError as e:
     import warnings
     warnings.warn(f"Could not import some modules: {e}")
@@ -40,6 +41,7 @@ __all__ = [
     "models", 
     "devices",
     "ops",
+    "components",
     "get_version",
     "get_device",
     "__version__",

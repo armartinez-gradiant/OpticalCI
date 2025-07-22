@@ -12,8 +12,9 @@ def quick_test():
     
     try:
         # Import from the fixed file
-        sys.path.append('examples')
-        from advanced_photonic_components import AddDropMRR
+        # sys.path.append("examples")  # No longer needed
+        # Updated imports:
+# from torchonn.layers import AddDropMRR  # or from torchonn.components import AddDropMRR
         
         # Create with fixed parameters
         add_drop = AddDropMRR(
