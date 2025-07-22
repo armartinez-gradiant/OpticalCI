@@ -230,7 +230,7 @@ For licensing inquiries, contact: armartinez@gradiant.org
 If you use OpticalCI in your research, please cite:
 
 ```bibtex
-@software{rodriguez2025OpticalCI,
+@software{armartinez2025OpticalCI,
   title={OpticalCI: A Modern PyTorch Library for Photonic Neural Networks},
   author={Anxo Rodríguez Martínez},
   year={2025},
