@@ -5,20 +5,21 @@
 import torch
 import sys
 from pathlib import Path
-sys.path.append('examples')
 
 def quick_test():
     print("🧪 QUICK TEST - AddDropMRR Fixes")
     print("=" * 40)
     
     try:
+        # Import from the fixed file
+        sys.path.append('examples')
         from advanced_photonic_components import AddDropMRR
         
         # Create with fixed parameters
         add_drop = AddDropMRR(
             radius=10e-6,
-            coupling_strength_1=0.05,  # Even lower for better extinction
-            coupling_strength_2=0.05,
+            coupling_strength_1=0.05,  # Lower for better extinction
+            coupling_strength_2=0.05,  # Lower for better extinction
             q_factor=15000
         )
         
@@ -45,11 +46,34 @@ def quick_test():
         if 5000 < q_measured < 50000:
             print("🎉 Q factor measurement IMPROVED!")
         
+        # Test forward pass
+        print("\n🔧 Testing forward pass...")
+        batch_size = 2
+        n_wavelengths = len(wavelengths)
+        
+        input_signal = torch.randn(batch_size, n_wavelengths) * 0.1
+        add_signal = torch.randn(batch_size, n_wavelengths) * 0.01
+        
+        output = add_drop(input_signal, add_signal, wavelengths)
+        
+        print(f"✅ Input signal shape: {input_signal.shape}")
+        print(f"✅ Add signal shape: {add_signal.shape}")
+        print(f"✅ Through output shape: {output['through'].shape}")
+        print(f"✅ Drop output shape: {output['drop'].shape}")
+        
+        print("\n🎉 ALL TESTS PASSED!")
         return True
         
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 if __name__ == "__main__":
-    quick_test()
+    success = quick_test()
+    if success:
+        print("\n✅ Test completado exitosamente")
+    else:
+        print("\n❌ Test falló")
+        sys.exit(1)

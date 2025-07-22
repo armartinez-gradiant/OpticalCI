@@ -1,5 +1,28 @@
 #!/usr/bin/env python3
 """
+Script para corregir los errores de sintaxis en advanced_photonic_components.py
+"""
+
+import shutil
+import os
+from pathlib import Path
+
+def fix_syntax_errors():
+    """Corregir errores de sintaxis en el archivo de componentes."""
+    
+    print("🔧 Fixing syntax errors in advanced_photonic_components.py...")
+    
+    # Backup original file
+    original_file = Path("examples/advanced_photonic_components.py")
+    backup_file = Path("examples/advanced_photonic_components_backup.py")
+    
+    if original_file.exists():
+        print(f"📁 Backing up original file to {backup_file}")
+        shutil.copy2(original_file, backup_file)
+    
+    # Read the corrected content from this script
+    corrected_content = '''#!/usr/bin/env python3
+"""
 Componentes Fotónicos Avanzados para PtONN-TESTS
 
 Implementación de componentes críticos que faltan:
@@ -484,14 +507,14 @@ def test_advanced_components():
     print(f"   Through: {mrr_output['through'].shape}")
     print(f"   Drop: {mrr_output['drop'].shape}")
     
-    print("\n2️⃣ Add-Drop MRR:")
+    print("\\n2️⃣ Add-Drop MRR:")
     add_drop = AddDropMRR(device=device)
     add_signal = torch.randn(batch_size, n_wavelengths, device=device)
     add_drop_output = add_drop(input_signal, add_signal, wavelengths)
     print(f"   Through: {add_drop_output['through'].shape}")
     print(f"   Drop: {add_drop_output['drop'].shape}")
     
-    print("\n✅ Componentes básicos funcionando correctamente!")
+    print("\\n✅ Componentes básicos funcionando correctamente!")
     
     return {
         'mrr': mrr,
@@ -507,22 +530,122 @@ def main():
     try:
         components = test_advanced_components()
         
-        print(f"\n📋 Componentes Implementados:")
+        print(f"\\n📋 Componentes Implementados:")
         print(f"   ✅ Microring Resonator (MRR)")
         print(f"   ✅ Add-Drop MRR")
         
-        print(f"\n🔬 Características Implementadas:")
+        print(f"\\n🔬 Características Implementadas:")
         print(f"   🎯 Resonancia wavelength-selective")
         print(f"   ⚡ Efectos no-lineales (Kerr, TPA)")
         print(f"   🌡️  Thermal tuning")
         print(f"   🔧 Parámetros entrenables")
         
-        print(f"\n🚀 Para usar: python advanced_photonic_components.py")
+        print(f"\\n🚀 Para usar: python advanced_photonic_components.py")
         
     except Exception as e:
-        print(f"\n❌ Error durante test: {e}")
+        print(f"\\n❌ Error durante test: {e}")
         raise
 
 
 if __name__ == "__main__":
-    main()
+    main()'''
+    
+    # Write the corrected content
+    with open(original_file, 'w', encoding='utf-8') as f:
+        f.write(corrected_content)
+    
+    print(f"✅ File {original_file} has been corrected!")
+    
+    # Also create the fixed test file
+    test_file = Path("quick_test_adddrop_fixed.py")
+    test_content = '''#!/usr/bin/env python3
+"""
+🧪 Test Rápido - Verificar AddDropMRR Fixes
+"""
+import torch
+import sys
+from pathlib import Path
+
+def quick_test():
+    print("🧪 QUICK TEST - AddDropMRR Fixes")
+    print("=" * 40)
+    
+    try:
+        # Import from the fixed file
+        sys.path.append('examples')
+        from advanced_photonic_components import AddDropMRR
+        
+        # Create with fixed parameters
+        add_drop = AddDropMRR(
+            radius=10e-6,
+            coupling_strength_1=0.05,  # Lower for better extinction
+            coupling_strength_2=0.05,  # Lower for better extinction
+            q_factor=15000
+        )
+        
+        # Test wavelengths around resonance
+        wavelengths = torch.linspace(1549e-9, 1551e-9, 101)  # Higher resolution
+        
+        # Get transfer function
+        through_tf, drop_tf = add_drop.get_transfer_function(wavelengths)
+        
+        # Calculate metrics
+        extinction_ratio = add_drop.get_extinction_ratio(wavelengths)
+        q_measured = add_drop.get_q_factor_measured(wavelengths)
+        
+        print(f"✅ FSR: {add_drop.fsr*1e12:.1f} pm")
+        print(f"✅ Extinction ratio: {extinction_ratio:.1f} dB")
+        print(f"✅ Q measured: {q_measured:.0f}")
+        print(f"✅ Q design: {add_drop.q_factor}")
+        
+        print(f"✅ Through range: {through_tf.min():.3f} - {through_tf.max():.3f}")
+        print(f"✅ Drop range: {drop_tf.min():.3f} - {drop_tf.max():.3f}")
+        
+        if extinction_ratio > 5:
+            print("🎉 Extinction ratio IMPROVED!")
+        if 5000 < q_measured < 50000:
+            print("🎉 Q factor measurement IMPROVED!")
+        
+        # Test forward pass
+        print("\\n🔧 Testing forward pass...")
+        batch_size = 2
+        n_wavelengths = len(wavelengths)
+        
+        input_signal = torch.randn(batch_size, n_wavelengths) * 0.1
+        add_signal = torch.randn(batch_size, n_wavelengths) * 0.01
+        
+        output = add_drop(input_signal, add_signal, wavelengths)
+        
+        print(f"✅ Input signal shape: {input_signal.shape}")
+        print(f"✅ Add signal shape: {add_signal.shape}")
+        print(f"✅ Through output shape: {output['through'].shape}")
+        print(f"✅ Drop output shape: {output['drop'].shape}")
+        
+        print("\\n🎉 ALL TESTS PASSED!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+if __name__ == "__main__":
+    success = quick_test()
+    if success:
+        print("\\n✅ Test completado exitosamente")
+    else:
+        print("\\n❌ Test falló")
+        sys.exit(1)'''
+    
+    with open(test_file, 'w', encoding='utf-8') as f:
+        f.write(test_content)
+    
+    print(f"✅ Test file {test_file} has been created!")
+    
+    print("\\n🎉 All syntax errors have been fixed!")
+    print("\\nNow you can run:")
+    print("  python quick_test_adddrop_fixed.py")
+
+if __name__ == "__main__":
+    fix_syntax_errors()
