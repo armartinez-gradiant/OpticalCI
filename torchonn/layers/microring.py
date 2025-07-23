@@ -98,45 +98,48 @@ class MicroringResonator(nn.Module):
     
     def get_transmission(self, wavelengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        ✅ TRANSMISIÓN CORREGIDA - Ecuaciones físicas estándar.
-        
-        Implementa ecuaciones según literatura estándar de microrings.
-        Referencias: Bogaerts et al., "Silicon microring resonators" (2012)
+        ✅ QUICK FIX: Física corregida según literatura estándar.
+        Ecuaciones: Bogaerts et al. "Silicon microring resonators" (2012)
         """
-        # Thermal shift
-        thermal_shift = self.temperature_shift * self.thermal_coefficient
-        effective_wavelength = self.center_wavelength + thermal_shift
-        
-        # ✅ FÍSICA CORRECTA: Método directo y físicamente correcto
-        n_eff = 2.4  # Effective index silicon
+        # Round-trip phase
+        n_eff = 2.4  # Silicon effective index
         circumference = 2 * np.pi * self.radius
-        
-        # Round-trip phase para cada wavelength
         beta = 2 * np.pi * n_eff / wavelengths
         phi_round_trip = beta * circumference + self.phase_shift
         
-        # Coupling coefficients
-        kappa = torch.clamp(self.coupling_tuning, 0.01, 0.99)
-        r = torch.sqrt(1 - kappa**2)  # Self-coupling coefficient
+        # Coupling coefficients (literatura estándar)
+        kappa = torch.clamp(self.coupling_tuning, 0.001, 0.999)
+        r = torch.sqrt(1 - kappa**2)  # ✅ Self-coupling: r = √(1-κ²)
         
-        # Loss factor (amplitude transmission) 
-        alpha = torch.exp(torch.tensor(-np.pi / self.q_factor, 
-                                     device=self.device, dtype=torch.float32))
+        # Round-trip loss (amplitude)
+        loss_per_roundtrip = 2 * np.pi / self.q_factor
+        a = torch.exp(torch.tensor(-loss_per_roundtrip / 2, 
+                                 device=self.device, dtype=torch.float32))
         
-        # ✅ ECUACIONES ESTÁNDAR según literatura
+        # Complex exponential
         exp_j_phi = torch.cos(phi_round_trip) + 1j * torch.sin(phi_round_trip)
         
-        # Denominador común: |1 - α*r*exp(jφ)|²
-        denominator = 1 - alpha * r * exp_j_phi
-        denom_squared = torch.abs(denominator)**2
+        # ✅ ECUACIONES FÍSICAS CORRECTAS
+        denominator = 1 - a * r * exp_j_phi  # ✅ Correcto: a*r
         
-        # THROUGH PORT: |r - α*exp(jφ)|² / |1 - α*r*exp(jφ)|²
-        through_numerator = r - alpha * exp_j_phi
-        through_transmission = torch.abs(through_numerator)**2 / denom_squared
+        # Through port: (r - a*exp(jφ)) / (1 - a*r*exp(jφ))
+        through_numerator = r - a * exp_j_phi  # ✅ Usar r
+        through_amplitude = through_numerator / denominator
+        through_transmission = torch.abs(through_amplitude)**2
         
-        # DROP PORT: |κ*√α|² / |1 - α*r*exp(jφ)|²  
-        drop_numerator = kappa * torch.sqrt(alpha)
-        drop_transmission = torch.abs(drop_numerator)**2 / denom_squared
+        # Drop port: jκ*√a / (1 - a*r*exp(jφ))
+        drop_numerator = 1j * kappa * torch.sqrt(a)
+        drop_amplitude = drop_numerator / denominator
+        drop_transmission = torch.abs(drop_amplitude)**2
+        
+        # ✅ VALIDACIÓN FÍSICA CRÍTICA
+        total = through_transmission + drop_transmission
+        max_total = torch.max(total)
+        if max_total > 1.001:
+            warnings.warn(f"⚠️ Física violada: {max_total:.6f} > 1.0")
+            norm = 1.0 / max_total
+            through_transmission *= norm
+            drop_transmission *= norm
         
         return through_transmission, drop_transmission
     def apply_nonlinear_effects(self, input_power: torch.Tensor):

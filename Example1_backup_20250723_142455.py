@@ -9,13 +9,6 @@ Ejemplo completo que demuestra las capacidades del repositorio con:
 - Validación física
 """
 
-
-# ✅ CORRECCIÓN DE PATHS - Permite ejecutar desde cualquier directorio
-import sys
-import os
-# Añadir directorio padre (raíz del repositorio) al path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -97,15 +90,15 @@ class PhotonicSimulationDemo:
         # Crear microring con parámetros específicos
         mrr = MicroringResonator(
             radius=10e-6,           # 10 μm radius
-            coupling_strength=0.3,   # ✅ Near critical coupling (optimizado)
-            q_factor=20000,          # ✅ Higher Q para mejor extinction ratio
+            coupling_strength=0.3,   # ✅ Near critical   # ✅ 20% coupling (near critical)
+            q_factor=20000,          # ✅ Higher Q          # ✅ Q = 15,000 (consistent)
             center_wavelength=1550e-9,  # 1550 nm
             device=self.device
         )
         
         # Wavelength sweep alrededor de resonancia
         n_points = 1000
-        wavelength_range = 400e-12  # ✅ ±200 pm (optimizado para Q=20k)
+        wavelength_range = 400e-12  # ✅ Optimized  # ✅ ±500 pm (ampliado 10x)
         wavelengths = torch.linspace(
             1550e-9 - wavelength_range/2, 
             1550e-9 + wavelength_range/2, 
@@ -207,7 +200,7 @@ class PhotonicSimulationDemo:
         print(f"   Wavelength central: {resonance_wavelength*1e9:.3f} nm")
         print(f"   ✅ Esperado: 1550.000 nm")
         print(f"   Extinction ratio: {extinction_ratio_db:.1f} dB")
-        print(f"   ✅ Esperado: 20-30 dB (Q=20k, κ=0.3)")
+        print(f"   ✅ Esperado: 15-25 dB (Q=15k, κ=0.3)")
         
         # Convertir FSR a float de manera segura
         fsr_theoretical_pm = fsr_theoretical * 1e12 if isinstance(fsr_theoretical, (int, float)) else fsr_theoretical.item() * 1e12
@@ -217,7 +210,7 @@ class PhotonicSimulationDemo:
         print(f"   FSR medido: {fsr_measured_pm:.1f} pm")
         print(f"   ✅ Esperado: ~100-200 pm (R=10μm)")
         print(f"   Q factor: {mrr.q_factor}")
-        print(f"   ✅ Esperado: 20,000")
+        print(f"   ✅ Esperado: 15,000")
         
         # Conservación de energía en resonancia
         energy_conservation = through_response[min_idx] + drop_response[min_idx]
@@ -245,7 +238,8 @@ class PhotonicSimulationDemo:
             radius=8e-6,
             coupling_strength_1=0.1,  # Input coupling
             coupling_strength_2=0.1,  # Drop coupling  
-            q_factor=20000,          # ✅ Higher Q para mejor extinction ratiocenter_wavelength=1550e-9,
+            q_factor=20000,
+            center_wavelength=1550e-9,
             device=self.device
         )
         
@@ -363,7 +357,9 @@ class PhotonicSimulationDemo:
                 # Capa intermedia: microring para no-linealidad
                 self.nonlinear_mrr = MicroringResonator(
                     radius=5e-6,
-                    coupling_strength=0.3,   # ✅ Near critical coupling (optimizado)q_factor=20000,          # ✅ Higher Q para mejor extinction ratiodevice=device
+                    coupling_strength=0.4,
+                    q_factor=10000,
+                    device=device
                 )
                 
                 # Capa de salida: control de fase

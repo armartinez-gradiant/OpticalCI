@@ -9,13 +9,6 @@ Ejemplo completo que demuestra las capacidades del repositorio con:
 - Validación física
 """
 
-
-# ✅ CORRECCIÓN DE PATHS - Permite ejecutar desde cualquier directorio
-import sys
-import os
-# Añadir directorio padre (raíz del repositorio) al path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
