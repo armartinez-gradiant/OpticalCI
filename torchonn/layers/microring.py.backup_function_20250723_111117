@@ -107,7 +107,7 @@ class MicroringResonator(nn.Module):
         thermal_shift = self.temperature_shift * self.thermal_coefficient
         effective_wavelength = self.center_wavelength + thermal_shift
         
-        # ✅ FÍSICA CORRECTA: Método directo y físicamente correcto
+        # ✅ FASE CORREGIDA: Método directo y físicamente correcto
         n_eff = 2.4  # Effective index silicon
         circumference = 2 * np.pi * self.radius
         

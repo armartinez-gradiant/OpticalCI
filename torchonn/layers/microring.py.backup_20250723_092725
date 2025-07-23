@@ -98,45 +98,74 @@ class MicroringResonator(nn.Module):
     
     def get_transmission(self, wavelengths: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        ✅ TRANSMISIÓN CORREGIDA - Ecuaciones físicas estándar.
-        
-        Implementa ecuaciones según literatura estándar de microrings.
-        Referencias: Bogaerts et al., "Silicon microring resonators" (2012)
+        Calcular transmisión - ECUACIONES FÍSICAS CORRECTAS CORREGIDAS.
         """
         # Thermal shift
         thermal_shift = self.temperature_shift * self.thermal_coefficient
         effective_wavelength = self.center_wavelength + thermal_shift
         
-        # ✅ FÍSICA CORRECTA: Método directo y físicamente correcto
+        # ✅ CORRECCIÓN PRINCIPAL: Phase detuning más preciso
+        delta_lambda = wavelengths - effective_wavelength
+        
+        # Para microring: φ = 2π * n_eff * L / λ
+        # Detuning: Δφ = φ - φ_resonance = 2π * n_eff * L * Δλ / λ²
         n_eff = 2.4  # Effective index silicon
         circumference = 2 * np.pi * self.radius
         
-        # Round-trip phase para cada wavelength
-        beta = 2 * np.pi * n_eff / wavelengths
-        phi_round_trip = beta * circumference + self.phase_shift
+        # Phase detuning desde resonancia
+        delta_phi = 2 * np.pi * n_eff * circumference * delta_lambda / (effective_wavelength**2)
+        total_phase = delta_phi + self.phase_shift
         
         # Coupling coefficients
-        kappa = torch.clamp(self.coupling_tuning, 0.01, 0.99)
-        r = torch.sqrt(1 - kappa**2)  # Self-coupling coefficient
+        kappa = torch.clamp(self.coupling_tuning, 0.001, 0.999)
+        t = torch.sqrt(1 - kappa**2)  # Transmission coefficient
         
-        # Loss factor (amplitude transmission) 
+        # Round-trip loss (amplitude)
         alpha = torch.exp(torch.tensor(-np.pi / self.q_factor, 
                                      device=self.device, dtype=torch.float32))
         
-        # ✅ ECUACIONES ESTÁNDAR según literatura
-        exp_j_phi = torch.cos(phi_round_trip) + 1j * torch.sin(phi_round_trip)
+        # ✅ ECUACIONES CORREGIDAS - Física estándar de microring
+        cos_phi = torch.cos(total_phase)
+        sin_phi = torch.sin(total_phase)
         
-        # Denominador común: |1 - α*r*exp(jφ)|²
-        denominator = 1 - alpha * r * exp_j_phi
-        denom_squared = torch.abs(denominator)**2
+        # Denominador común: |1 - α*t*exp(jφ)|²
+        denom_real = 1 - alpha * t * cos_phi
+        denom_imag = alpha * t * sin_phi
+        denom_squared = denom_real**2 + denom_imag**2
         
-        # THROUGH PORT: |r - α*exp(jφ)|² / |1 - α*r*exp(jφ)|²
-        through_numerator = r - alpha * exp_j_phi
-        through_transmission = torch.abs(through_numerator)**2 / denom_squared
+        # ✅ THROUGH PORT: |t - α*exp(jφ)|² / |1 - α*t*exp(jφ)|²
+        through_num_real = t - alpha * cos_phi
+        through_num_imag = alpha * sin_phi
+        through_num_squared = through_num_real**2 + through_num_imag**2
+        through_transmission = through_num_squared / denom_squared
         
-        # DROP PORT: |κ*√α|² / |1 - α*r*exp(jφ)|²  
-        drop_numerator = kappa * torch.sqrt(alpha)
-        drop_transmission = torch.abs(drop_numerator)**2 / denom_squared
+        # ✅ DROP PORT: |jκ*√α|² / |1 - α*t*exp(jφ)|²
+        drop_num_squared = kappa**2 * alpha  # |jκ√α|² = κ²α
+        drop_transmission = drop_num_squared / denom_squared
+        
+        # ✅ VALIDACIÓN: Conservación de energía
+        total_power = through_transmission + drop_transmission
+        
+        # Añadir pérdidas por round-trip
+        loss_power = 1 - alpha**2  # Power loss per round-trip
+        
+        # Total teórico (incluye pérdidas)
+        total_with_loss = total_power + loss_power.expand_as(total_power)
+        
+        # ✅ VERIFICACIÓN: El máximo total no debe exceder 1.0
+        max_total = torch.max(total_power)
+        if max_total > 1.1:  # 10% tolerance
+            print(f"⚠️ MRR: Power conservation issue: max_total = {max_total:.3f}")
+            # Renormalizar si es necesario
+            normalization = 1.0 / max_total
+            through_transmission *= normalization
+            drop_transmission *= normalization
+        
+        # ✅ VERIFICACIÓN: Through debe tener máximo ~1.0
+        max_through = torch.max(through_transmission)
+        if max_through < 0.1:
+            print(f"⚠️ MRR: Through transmission muy bajo: {max_through:.4f}")
+            print(f"   κ={kappa.item():.4f}, α={alpha.item():.4f}, t={t.item():.4f}")
         
         return through_transmission, drop_transmission
     def apply_nonlinear_effects(self, input_power: torch.Tensor):
