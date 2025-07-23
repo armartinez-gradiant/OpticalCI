@@ -90,7 +90,7 @@ class PhotonicSimulationDemo:
         # Crear microring con parámetros específicos
         mrr = MicroringResonator(
             radius=10e-6,           # 10 μm radius
-            coupling_strength=0.15,  # 30% coupling
+            coupling_strength=0.02,  # 30% coupling
             q_factor=25000,         # Q = 15,000
             center_wavelength=1550e-9,  # 1550 nm
             device=self.device
@@ -98,7 +98,7 @@ class PhotonicSimulationDemo:
         
         # Wavelength sweep alrededor de resonancia
         n_points = 1000
-        wavelength_range = 5e-9  # ±2.5 nm around center
+        wavelength_range = 100e-12  # ±50 pm around center
         wavelengths = torch.linspace(
             1550e-9 - wavelength_range/2, 
             1550e-9 + wavelength_range/2, 
@@ -108,6 +108,7 @@ class PhotonicSimulationDemo:
         
         # Input signal uniforme
         input_signal = torch.ones(1, n_points, device=self.device)
+        
         
         # Simular respuesta
         with torch.no_grad():
@@ -184,6 +185,10 @@ class PhotonicSimulationDemo:
         else:
             fsr_measured = torch.tensor(fsr_theoretical, device=self.device)
         
+                
+        # 🔍 DEBUG Simple: Parámetros del microring
+        kappa_value = mrr.coupling_tuning.item()
+        print(f"   🔍 Debug - κ: {kappa_value:.4f}, Q: {mrr.q_factor}")
         print(f"📊 Resultados Microring:")
         print(f"   Wavelength central: {resonance_wavelength*1e9:.3f} nm")
         print(f"   ✅ Esperado: 1550.000 nm")
