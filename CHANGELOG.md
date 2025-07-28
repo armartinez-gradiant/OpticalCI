@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to PtONN-TESTS by Anxo Rodríguez Martínez will be documented in this file.
+All notable changes to OpticalCI by Anxo Rodríguez Martínez will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-07-16
  
 ### Added
-- Initial release of PtONN-TESTS
+- Initial release of OpticalCI
 - Modern PyTorch compatibility (2.0+)
 - Updated MZI layer implementations
 - Comprehensive test suite
@@ -68,4 +68,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-- **v0.1.0**: Initial release with modern PyTorch compatibility
+- **v1.0.0**: Initial release with modern PyTorch compatibility
