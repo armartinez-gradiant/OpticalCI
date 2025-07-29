@@ -1,8 +1,10 @@
 """
-Detector Components for PtONN-TESTS  
+Detector Components for OpticalCI
 
 Implementation of photodetectors and optical-to-electrical
 conversion components for photonic neural networks.
+
+✅ FIXED: Photodetectors now guarantee non-negative currents
 """ 
 
 import torch
@@ -14,9 +16,9 @@ import warnings
 
 class Photodetector(nn.Module):
     """
-    Photodetector - Conversión óptico-eléctrica.
+    Photodetector - Conversión óptico-eléctrica - FIXED VERSION.
     
-    Convierte potencia óptica a corriente eléctrica.
+    ✅ CORRECCIÓN: Garantiza corrientes no-negativas físicamente correctas.
     """
     
     def __init__(
@@ -40,13 +42,13 @@ class Photodetector(nn.Module):
     
     def forward(self, optical_signal: torch.Tensor) -> torch.Tensor:
         """
-        Convertir señal óptica a eléctrica.
+        Convertir señal óptica a eléctrica - FIXED VERSION.
         
         Args:
             optical_signal: [batch_size, n_wavelengths] - Campo óptico
             
         Returns:
-            electrical_current: [batch_size, n_wavelengths] - Corriente
+            electrical_current: [batch_size, n_wavelengths] - Corriente (≥0)
         """
         # Optical power = |E|²
         optical_power = torch.abs(optical_signal)**2
@@ -62,6 +64,10 @@ class Photodetector(nn.Module):
             noise_std = torch.sqrt(torch.tensor(self.thermal_noise * self.bandwidth, device=self.device))
             thermal_noise = torch.randn_like(photocurrent) * noise_std
             photocurrent += thermal_noise
+        
+        # ✅ FIX CRÍTICO: Garantizar corrientes físicamente correctas (≥0)
+        # Los photodetectores físicos NO pueden generar corrientes negativas
+        photocurrent = torch.clamp(photocurrent, min=0.0)
         
         return photocurrent
 

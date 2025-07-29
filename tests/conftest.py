@@ -1,5 +1,5 @@
 """
-Configuración común para tests de PtONN-TESTS
+Configuración común para tests de OpticalCI
 
 Este archivo contiene:
 - Fixtures comunes para todos los tests

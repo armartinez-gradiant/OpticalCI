@@ -1,5 +1,5 @@
 """
-Tests para Models - PtONN-TESTS
+Tests para Models - OpticalCI
 
 Suite de tests que valida:
 - ONNBaseModel y funcionalidades base

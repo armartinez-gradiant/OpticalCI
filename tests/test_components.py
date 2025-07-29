@@ -1,5 +1,5 @@
 """
-Tests para Components - PtONN-TESTS
+Tests para Components - OpticalCI
 
 Suite completa de tests que valida:
 - WDM Multiplexer/Demultiplexer

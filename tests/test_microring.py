@@ -1,5 +1,5 @@
 """
-Tests para Microring Resonators - PtONN-TESTS
+Tests para Microring Resonators - OpticalCI
 
 Suite completa de tests que valida:
 - Conservación de energía (drop ≤ 1.0)
