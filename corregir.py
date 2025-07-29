@@ -622,6 +622,8 @@ def apply_test_fix():
 
 def run_verification():
     """Ejecutar verificación inmediata."""
+    import torch  # ✅ FIX: Agregar import faltante
+    import numpy as np
     print("🔍 Verificando correcciones...")
     
     try:

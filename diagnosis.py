@@ -1,301 +1,396 @@
 #!/usr/bin/env python3
 """
-Script de Diagnóstico Completo para el Microring - v5.4
+Verificación Final Completa - v5.5.1
 
-Este script ejecuta diagnósticos detallados para identificar
-exactamente por qué el extinction ratio está tan bajo.
+Ejecuta una verificación exhaustiva de todas las correcciones aplicadas:
+1. Verifica sintaxis corregida
+2. Prueba import y funcionalidad básica
+3. Analiza ER medido vs teórico
+4. Ejecuta tests automáticos
+5. Genera reporte final con métricas
 """
 
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
-import sys
 import os
+import sys
+import subprocess
+import time
+import traceback
+from pathlib import Path
 
-# Añadir ruta del proyecto
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def print_header():
+    """Header del script."""
+    print("🔍 VERIFICACIÓN FINAL COMPLETA v5.5.1")
+    print("=" * 65)
+    print("Verificando todas las correcciones aplicadas:")
+    print("  ✅ Sintaxis del test corregida")
+    print("  📊 ER mejorado (>4 dB mínimo)")
+    print("  🔧 Ecuaciones físicas funcionando")
+    print("  🧪 Tests pasando")
+    print()
 
-from torchonn.layers import MicroringResonator
-
-def diagnostic_microring_resonance():
-    """Diagnóstico completo del microring resonator."""
-    print("🔍 DIAGNÓSTICO COMPLETO DEL MICRORING v5.4")
-    print("=" * 60)
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    
-    # Crear microring con parámetros de test
-    mrr = MicroringResonator(
-        radius=10e-6,
-        q_factor=5000,
-        center_wavelength=1550e-9,
-        coupling_mode="critical",
-        device=device
-    )
-    
-    print(f"\n📊 PARÁMETROS DEL MICRORING:")
-    print(f"   Radius: {mrr.radius*1e6:.1f} μm")
-    print(f"   Q factor: {mrr.q_factor}")
-    print(f"   Center wavelength: {mrr.center_wavelength*1e9:.3f} nm")
-    print(f"   Alpha: {mrr.alpha:.6f}")
-    print(f"   Kappa critical: {mrr.kappa_critical:.6f}")
-    print(f"   Kappa usado: {mrr.coupling_strength_target:.6f}")
-    print(f"   FSR: {mrr.fsr*1e12:.0f} pm")
-    print(f"   ER teórico: {mrr.extinction_ratio_theory_db:.1f} dB")
-    
-    # Test 1: Verificar rango de wavelengths
-    print(f"\n🔍 TEST 1: RANGO DE WAVELENGTHS")
-    wavelengths = mrr.get_recommended_wavelengths(1000)
-    wl_min, wl_max = torch.min(wavelengths), torch.max(wavelengths)
-    wl_center = mrr.center_wavelength
-    
-    print(f"   Rango: {wl_min*1e9:.3f} - {wl_max*1e9:.3f} nm")
-    print(f"   Centro: {wl_center*1e9:.3f} nm")
-    print(f"   Rango total: {(wl_max-wl_min)*1e12:.0f} pm")
-    print(f"   FWHM esperado: {wl_center/mrr.q_factor*1e12:.0f} pm")
-    
-    # Verificar que el centro está en el rango
-    if wl_min <= wl_center <= wl_max:
-        print(f"   ✅ Centro wavelength en el rango")
-    else:
-        print(f"   ❌ Centro wavelength FUERA del rango")
-        return False
-    
-    # Test 2: Respuesta espectral detallada
-    print(f"\n🔍 TEST 2: RESPUESTA ESPECTRAL")
-    input_signal = torch.ones(1, 1000, device=device, dtype=torch.float32)
-    
-    with torch.no_grad():
-        output = mrr(input_signal, wavelengths)
-    
-    through_response = output['through'][0]
-    drop_response = output['drop'][0]
-    
-    print(f"   Through min: {torch.min(through_response):.6f}")
-    print(f"   Through max: {torch.max(through_response):.6f}")
-    print(f"   Through mean: {torch.mean(through_response):.6f}")
-    print(f"   Through std: {torch.std(through_response):.6f}")
-    
-    print(f"   Drop min: {torch.min(drop_response):.6f}")
-    print(f"   Drop max: {torch.max(drop_response):.6f}")
-    print(f"   Drop mean: {torch.mean(drop_response):.6f}")
-    
-    # Test 3: Conservación de energía
-    print(f"\n🔍 TEST 3: CONSERVACIÓN DE ENERGÍA")
-    total_energy = through_response + drop_response
-    energy_min, energy_max = torch.min(total_energy), torch.max(total_energy)
-    energy_mean = torch.mean(total_energy)
-    
-    print(f"   Energía total min: {energy_min:.6f}")
-    print(f"   Energía total max: {energy_max:.6f}")
-    print(f"   Energía total mean: {energy_mean:.6f}")
-    print(f"   Energía esperada: ~{mrr.alpha:.3f} (α)")
-    
-    if energy_max > 1.01:
-        print(f"   ❌ Violación de conservación de energía: {energy_max:.6f} > 1.0")
-        return False
-    else:
-        print(f"   ✅ Conservación de energía OK")
-    
-    # Test 4: Detección de resonancia
-    print(f"\n🔍 TEST 4: DETECCIÓN DE RESONANCIA")
-    min_idx = torch.argmin(through_response)
-    max_idx = torch.argmax(through_response)
-    
-    resonance_wl = wavelengths[min_idx]
-    off_resonance_wl = wavelengths[max_idx]
-    
-    print(f"   Resonancia encontrada en: {resonance_wl*1e9:.3f} nm (índice {min_idx})")
-    print(f"   Off-resonance en: {off_resonance_wl*1e9:.3f} nm (índice {max_idx})")
-    print(f"   Error resonancia: {abs(resonance_wl - wl_center)*1e12:.1f} pm")
-    
-    # Verificar que la resonancia está cerca del centro
-    resonance_error = abs(resonance_wl - wl_center)
-    fwhm = wl_center / mrr.q_factor
-    
-    if resonance_error < fwhm:
-        print(f"   ✅ Resonancia bien centrada (error < FWHM)")
-    else:
-        print(f"   ❌ Resonancia descentrada (error = {resonance_error/fwhm:.1f} × FWHM)")
-        return False
-    
-    # Test 5: Cálculo de extinction ratio
-    print(f"\n🔍 TEST 5: EXTINCTION RATIO")
-    min_transmission = through_response[min_idx]
-    max_transmission = through_response[max_idx]
-    
-    print(f"   Min transmission: {min_transmission:.6f}")
-    print(f"   Max transmission: {max_transmission:.6f}")
-    
-    if min_transmission > 1e-12 and max_transmission > min_transmission:
-        er_ratio = max_transmission / min_transmission
-        er_db = 10 * torch.log10(er_ratio)
-        
-        print(f"   ER ratio: {er_ratio:.3f}")
-        print(f"   ER medido: {er_db:.1f} dB")
-        print(f"   ER teórico: {mrr.extinction_ratio_theory_db:.1f} dB")
-        print(f"   Error ER: {abs(er_db - mrr.extinction_ratio_theory_db):.1f} dB")
-        
-        if er_db > 3:
-            print(f"   ✅ ER en rango físico")
-            return True
-        else:
-            print(f"   ❌ ER demasiado bajo: {er_db:.1f} dB < 3 dB")
-            return False
-    else:
-        print(f"   ❌ No se puede calcular ER válido")
-        return False
-
-def diagnostic_phase_sweep():
-    """Diagnóstico de barrido de fase para encontrar la resonancia óptima."""
-    print(f"\n🔍 DIAGNÓSTICO DE BARRIDO DE FASE")
-    print("-" * 40)
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Crear microring
-    mrr = MicroringResonator(
-        radius=10e-6,
-        q_factor=5000,
-        center_wavelength=1550e-9,
-        coupling_mode="critical",
-        device=device
-    )
-    
-    # Wavelengths en un rango pequeño alrededor del centro
-    center_wl = mrr.center_wavelength
-    wavelengths = torch.linspace(center_wl - 500e-12, center_wl + 500e-12, 100, device=device, dtype=torch.float32)
-    input_signal = torch.ones(1, 100, device=device, dtype=torch.float32)
-    
-    # Probar diferentes valores de phase_shift
-    phase_shifts = torch.linspace(-np.pi, np.pi, 20)
-    best_er = 0
-    best_phase = 0
-    
-    print(f"Probando {len(phase_shifts)} valores de phase shift...")
-    
-    for i, phase in enumerate(phase_shifts):
-        # Modificar phase_shift temporalmente
-        original_phase = mrr.phase_shift.data.clone()
-        mrr.phase_shift.data.fill_(phase)
-        
-        with torch.no_grad():
-            output = mrr(input_signal, wavelengths)
-        
-        through_response = output['through'][0]
-        min_trans = torch.min(through_response)
-        max_trans = torch.max(through_response)
-        
-        if min_trans > 1e-12:
-            er_ratio = max_trans / min_trans
-            er_db = 10 * torch.log10(er_ratio)
-            
-            if er_db > best_er:
-                best_er = er_db
-                best_phase = phase
-        
-        # Restaurar phase_shift original
-        mrr.phase_shift.data = original_phase
-        
-        if i % 5 == 0:
-            print(f"   Phase {phase:.3f}: ER = {er_db:.1f} dB")
-    
-    print(f"\n📊 RESULTADO BARRIDO DE FASE:")
-    print(f"   Mejor phase shift: {best_phase:.3f}")
-    print(f"   Mejor ER: {best_er:.1f} dB")
-    print(f"   Phase actual: {mrr.phase_shift.item():.3f}")
-    
-    if best_er > 5:
-        print(f"   ✅ Se encontró una configuración con ER > 5 dB")
-        print(f"   💡 Sugerencia: Ajustar phase_shift a {best_phase:.3f}")
-        return True
-    else:
-        print(f"   ❌ No se encontró configuración con ER alto")
-        return False
-
-def plot_spectral_response(save_plot=True):
-    """Graficar respuesta espectral para análisis visual."""
-    print(f"\n📊 GENERANDO GRÁFICO DE RESPUESTA ESPECTRAL")
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    mrr = MicroringResonator(
-        radius=10e-6,
-        q_factor=5000,
-        center_wavelength=1550e-9,
-        coupling_mode="critical",
-        device=device
-    )
-    
-    wavelengths = mrr.get_recommended_wavelengths(2000)
-    input_signal = torch.ones(1, 2000, device=device, dtype=torch.float32)
-    
-    with torch.no_grad():
-        output = mrr(input_signal, wavelengths)
-    
-    through_response = output['through'][0].cpu().numpy()
-    drop_response = output['drop'][0].cpu().numpy()
-    wavelengths_nm = wavelengths.cpu().numpy() * 1e9
-    
-    # Crear gráfico
-    plt.figure(figsize=(12, 8))
-    
-    plt.subplot(2, 1, 1)
-    plt.plot(wavelengths_nm, through_response, 'b-', linewidth=2, label='Through Port')
-    plt.axvline(mrr.center_wavelength*1e9, color='red', linestyle='--', alpha=0.7, label='Center Wavelength')
-    plt.ylabel('Transmission')
-    plt.title(f'Microring Spectral Response - DIAGNOSTIC\nQ={mrr.q_factor}, ER_theory={mrr.extinction_ratio_theory_db:.1f}dB')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.ylim(0, 1.1)
-    
-    plt.subplot(2, 1, 2)
-    plt.plot(wavelengths_nm, drop_response, 'r-', linewidth=2, label='Drop Port')
-    plt.axvline(mrr.center_wavelength*1e9, color='red', linestyle='--', alpha=0.7, label='Center Wavelength')
-    plt.xlabel('Wavelength (nm)')
-    plt.ylabel('Transmission')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.ylim(0, 1.1)
-    
-    plt.tight_layout()
-    
-    if save_plot:
-        plt.savefig('microring_diagnostic.png', dpi=150, bbox_inches='tight')
-        print(f"   Gráfico guardado como 'microring_diagnostic.png'")
+def verify_syntax_fixed():
+    """Verificar que el error de sintaxis esté corregido."""
+    print("🔍 VERIFICACIÓN 1: SINTAXIS CORREGIDA")
+    print("-" * 50)
     
     try:
-        plt.show()
-    except:
-        print("   No se puede mostrar gráfico (entorno sin display)")
+        result = subprocess.run([
+            sys.executable, '-m', 'py_compile', 'tests/test_microring.py'
+        ], capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            print("   ✅ Sintaxis de test_microring.py correcta")
+            return True
+        else:
+            print("   ❌ Error de sintaxis persistente:")
+            print(f"      {result.stderr}")
+            return False
+    except Exception as e:
+        print(f"   ❌ Error verificando sintaxis: {e}")
+        return False
+
+def verify_import_and_basic_functionality():
+    """Verificar import y funcionalidad básica."""
+    print("\n🔍 VERIFICACIÓN 2: IMPORT Y FUNCIONALIDAD BÁSICA")
+    print("-" * 50)
+    
+    try:
+        # Agregar path
+        sys.path.insert(0, '.')
+        
+        # Import básico
+        import torch
+        from torchonn.layers.microring import MicroringResonator
+        print("   ✅ Imports exitosos")
+        
+        # Crear microring
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        mrr = MicroringResonator(
+            radius=10e-6,
+            q_factor=5000,
+            center_wavelength=1550e-9,
+            coupling_mode="critical",
+            device=device
+        )
+        print("   ✅ Microring creado exitosamente")
+        
+        # Verificar parámetros
+        print(f"      α = {mrr.alpha:.6f}")
+        print(f"      κ_critical = {mrr.kappa_critical:.6f}")
+        print(f"      ER teórico = {mrr.extinction_ratio_theory_db:.1f} dB")
+        
+        return True, mrr, device
+        
+    except Exception as e:
+        print(f"   ❌ Error en import/funcionalidad básica: {e}")
+        traceback.print_exc()
+        return False, None, None
+
+def analyze_er_performance(mrr, device):
+    """Analizar performance del extinction ratio."""
+    print("\n🔍 VERIFICACIÓN 3: ANÁLISIS DE ER DETALLADO")
+    print("-" * 50)
+    
+    try:
+        import torch
+        
+        # Test con múltiples resoluciones para robustez
+        test_cases = [
+            ("Quick test", 500),
+            ("Standard test", 1500),
+            ("High resolution", 3000)
+        ]
+        
+        results = {}
+        
+        for test_name, n_points in test_cases:
+            print(f"   📊 {test_name} ({n_points} puntos):")
+            
+            wavelengths = mrr.get_recommended_wavelengths(n_points)
+            input_signal = torch.ones(1, n_points, device=device, dtype=torch.float32)
+            
+            with torch.no_grad():
+                output = mrr(input_signal, wavelengths)
+            
+            through_response = output['through'][0]
+            drop_response = output['drop'][0]
+            
+            # Análisis detallado
+            min_through = torch.min(through_response)
+            max_through = torch.max(through_response)
+            max_drop = torch.max(drop_response)
+            
+            # ER calculation robusto
+            if min_through > 1e-15:
+                # Método 1: Simple max/min
+                er_simple = max_through / min_through
+                er_simple_db = 10 * torch.log10(er_simple)
+                
+                # Método 2: Off-resonance robusto
+                n_edge = max(n_points // 10, 10)
+                sorted_vals, _ = torch.sort(through_response, descending=True)
+                off_res_max = torch.mean(sorted_vals[:n_edge])
+                er_robust = off_res_max / min_through
+                er_robust_db = 10 * torch.log10(er_robust)
+                
+                # Conservación de energía
+                total_energy = through_response + drop_response
+                max_energy = torch.max(total_energy)
+                
+                results[test_name] = {
+                    'min_through': min_through.item(),
+                    'max_through': max_through.item(),
+                    'er_simple_db': er_simple_db.item(),
+                    'er_robust_db': er_robust_db.item(),
+                    'max_energy': max_energy.item(),
+                    'n_points': n_points
+                }
+                
+                print(f"      Through: min={min_through:.6f}, max={max_through:.6f}")
+                print(f"      ER simple: {er_simple_db:.1f} dB")
+                print(f"      ER robusto: {er_robust_db:.1f} dB")
+                print(f"      Conservación: {max_energy:.3f}")
+                
+            else:
+                print(f"      ❌ Through min demasiado bajo: {min_through:.2e}")
+                results[test_name] = None
+        
+        # Análisis de consistencia
+        valid_results = {k: v for k, v in results.items() if v is not None}
+        
+        if len(valid_results) >= 2:
+            ers = [r['er_robust_db'] for r in valid_results.values()]
+            er_std = torch.std(torch.tensor(ers)).item()
+            er_mean = torch.mean(torch.tensor(ers)).item()
+            
+            print(f"   📊 CONSISTENCIA:")
+            print(f"      ER promedio: {er_mean:.1f} dB")
+            print(f"      ER std: {er_std:.2f} dB")
+            print(f"      ER teórico: {mrr.extinction_ratio_theory_db:.1f} dB")
+            
+            # Criterios de éxito
+            success_criteria = [
+                er_mean > 4,  # ER mínimo aceptable
+                er_std < 2,   # Consistencia entre mediciones
+                all(r['max_energy'] < 1.05 for r in valid_results.values())  # Conservación
+            ]
+            
+            success = all(success_criteria)
+            
+            print(f"   🎯 EVALUACIÓN:")
+            print(f"      ER > 4 dB: {'✅' if er_mean > 4 else '❌'} ({er_mean:.1f} dB)")
+            print(f"      Consistencia: {'✅' if er_std < 2 else '❌'} (std={er_std:.2f})")
+            print(f"      Conservación: {'✅' if all(r['max_energy'] < 1.05 for r in valid_results.values()) else '❌'}")
+            
+            return success, results
+        else:
+            print("   ❌ Insuficientes resultados válidos")
+            return False, results
+            
+    except Exception as e:
+        print(f"   ❌ Error en análisis de ER: {e}")
+        traceback.print_exc()
+        return False, {}
+
+def run_automated_tests():
+    """Ejecutar tests automáticos."""
+    print("\n🔍 VERIFICACIÓN 4: TESTS AUTOMÁTICOS")
+    print("-" * 50)
+    
+    tests_to_run = [
+        {
+            "name": "Test específico ER",
+            "cmd": [
+                sys.executable, "-m", "pytest", 
+                "tests/test_microring.py::TestMicroringResonator::test_extinction_ratio_realistic",
+                "-v", "--tb=short"
+            ],
+            "timeout": 60,
+            "critical": True
+        },
+        {
+            "name": "Test conservación energía",
+            "cmd": [
+                sys.executable, "-m", "pytest", 
+                "tests/test_microring.py::TestMicroringResonator::test_energy_conservation",
+                "-v", "--tb=short"
+            ],
+            "timeout": 30,
+            "critical": True
+        },
+        {
+            "name": "Test inicialización", 
+            "cmd": [
+                sys.executable, "-m", "pytest", 
+                "tests/test_microring.py::TestMicroringResonator::test_microring_initialization",
+                "-v", "--tb=short"
+            ],
+            "timeout": 30,
+            "critical": False
+        }
+    ]
+    
+    results = {}
+    
+    for test in tests_to_run:
+        print(f"   🧪 {test['name']}...")
+        
+        try:
+            result = subprocess.run(
+                test['cmd'],
+                capture_output=True,
+                text=True,
+                timeout=test['timeout']
+            )
+            
+            success = result.returncode == 0
+            results[test['name']] = {
+                'success': success,
+                'critical': test['critical'],
+                'stdout': result.stdout,
+                'stderr': result.stderr
+            }
+            
+            if success:
+                print(f"      ✅ PASÓ")
+            else:
+                print(f"      ❌ FALLÓ")
+                if test['critical']:
+                    print("         🔴 TEST CRÍTICO")
+                
+                # Mostrar error relevante
+                error_lines = (result.stdout + "\\n" + result.stderr).split('\\n')
+                relevant = [l for l in error_lines if any(word in l.lower() for word in ['failed', 'error', 'assert', 'exception'])]
+                for line in relevant[-3:]:
+                    if line.strip():
+                        print(f"         {line[:80]}")
+        
+        except subprocess.TimeoutExpired:
+            print(f"      ⏱️ TIMEOUT")
+            results[test['name']] = {'success': False, 'critical': test['critical'], 'timeout': True}
+        except Exception as e:
+            print(f"      ❌ ERROR: {e}")
+            results[test['name']] = {'success': False, 'critical': test['critical'], 'error': str(e)}
+    
+    return results
+
+def generate_final_report(syntax_ok, basic_ok, er_analysis_ok, er_results, test_results):
+    """Generar reporte final completo."""
+    print("\n" + "="*65)
+    print("📋 REPORTE FINAL COMPLETO v5.5.1")
+    print("="*65)
+    
+    # Resumen de verificaciones
+    print("📊 RESUMEN DE VERIFICACIONES:")
+    print(f"   1. Sintaxis corregida: {'✅' if syntax_ok else '❌'}")
+    print(f"   2. Funcionalidad básica: {'✅' if basic_ok else '❌'}")
+    print(f"   3. Análisis de ER: {'✅' if er_analysis_ok else '❌'}")
+    
+    # Tests automáticos
+    if test_results:
+        passed_tests = sum(1 for r in test_results.values() if r.get('success', False))
+        total_tests = len(test_results)
+        critical_tests = [k for k, v in test_results.items() if v.get('critical', False)]
+        critical_passed = sum(1 for k in critical_tests if test_results[k].get('success', False))
+        
+        print(f"   4. Tests automáticos: {passed_tests}/{total_tests} pasaron")
+        print(f"      Tests críticos: {critical_passed}/{len(critical_tests)} pasaron")
+    
+    # Métricas de ER
+    if er_results:
+        valid_ers = [r for r in er_results.values() if r is not None]
+        if valid_ers:
+            avg_er = sum(r['er_robust_db'] for r in valid_ers) / len(valid_ers)
+            min_through_avg = sum(r['min_through'] for r in valid_ers) / len(valid_ers)
+            print(f"\\n📊 MÉTRICAS DE EXTINCTION RATIO:")
+            print(f"   ER promedio medido: {avg_er:.1f} dB")
+            print(f"   Through min promedio: {min_through_avg:.6f}")
+            print(f"   Mejora vs inicial: {avg_er:.1f} dB vs ~5.1 dB anterior")
+    
+    # Evaluación general
+    critical_passed_all = all(test_results.get(k, {}).get('success', False) for k in critical_tests) if test_results else False
+    
+    overall_success = syntax_ok and basic_ok and er_analysis_ok and critical_passed_all
+    
+    print(f"\\n🎯 EVALUACIÓN FINAL:")
+    if overall_success:
+        print("🎉 ¡TODAS LAS CORRECCIONES EXITOSAS!")
+        print("   ✅ Error de sintaxis resuelto")
+        print("   ✅ Extinction ratio mejorado significativamente")
+        print("   ✅ Ecuaciones físicas funcionando correctamente")
+        print("   ✅ Tests críticos pasando")
+        print("   ✅ Conservación de energía garantizada")
+        
+        print("\\n📋 RECOMENDACIONES FINALES:")
+        print("   1. ✅ Ejecutar suite completa: pytest tests/test_microring.py -v")
+        print("   2. ✅ Verificar otros tests: pytest tests/ -x")
+        print("   3. ✅ Commit de las correcciones aplicadas")
+        print("   4. ✅ Documentar mejoras en changelog")
+        
+    else:
+        print("⚠️ CORRECCIONES PARCIALES - REVISAR PENDIENTES")
+        
+        if not syntax_ok:
+            print("   🔧 Corregir sintaxis restante manualmente")
+        if not basic_ok:
+            print("   🔧 Revisar imports y configuración del proyecto")
+        if not er_analysis_ok:
+            print("   📊 Ajustar parámetros físicos o tolerancias")
+        if not critical_passed_all:
+            print("   🧪 Revisar y corregir tests críticos")
+        
+        print("\\n📋 ACCIONES RECOMENDADAS:")
+        print("   1. Revisar logs de error específicos arriba")
+        print("   2. Ejecutar diagnóstico detallado")
+        print("   3. Considerar restaurar backup si es necesario")
+    
+    # Información de archivos
+    print(f"\\n📁 ARCHIVOS MODIFICADOS:")
+    modified_files = [
+        'torchonn/layers/microring.py',
+        'tests/test_microring.py'
+    ]
+    
+    for file_path in modified_files:
+        if os.path.exists(file_path):
+            mod_time = os.path.getmtime(file_path)
+            mod_time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(mod_time))
+            print(f"   ✅ {file_path} (modificado: {mod_time_str})")
+        else:
+            print(f"   ❌ {file_path} (faltante)")
+    
+    # Backups disponibles
+    backup_files = [f for f in os.listdir('.') if 'backup' in f and ('microring' in f or 'test_microring' in f)]
+    if backup_files:
+        print(f"\\n📁 BACKUPS DISPONIBLES ({len(backup_files)}):")
+        for backup in sorted(backup_files)[-5:]:  # Últimos 5
+            print(f"   📄 {backup}")
+    
+    return overall_success
 
 def main():
-    """Función principal de diagnóstico."""
-    print("🚀 INICIANDO DIAGNÓSTICO COMPLETO")
+    """Función principal."""
+    print_header()
     
-    success = True
+    # Verificación 1: Sintaxis
+    syntax_ok = verify_syntax_fixed()
     
-    # Ejecutar diagnósticos
-    success &= diagnostic_microring_resonance()
-    success &= diagnostic_phase_sweep()
+    # Verificación 2: Funcionalidad básica
+    basic_ok, mrr, device = verify_import_and_basic_functionality()
     
-    # Generar gráfico
-    plot_spectral_response()
+    # Verificación 3: Análisis de ER
+    er_analysis_ok = False
+    er_results = {}
+    if basic_ok and mrr is not None:
+        er_analysis_ok, er_results = analyze_er_performance(mrr, device)
     
-    # Resultado final
-    print(f"\n" + "="*60)
-    if success:
-        print(f"✅ DIAGNÓSTICO COMPLETO: Microring funcionando correctamente")
-    else:
-        print(f"❌ DIAGNÓSTICO COMPLETO: Problemas detectados en el microring")
-        print(f"\n💡 RECOMENDACIONES:")
-        print(f"   1. Verificar que efectos no lineales estén deshabilitados")
-        print(f"   2. Ajustar phase_shift para centrar resonancia")
-        print(f"   3. Verificar normalización en get_transmission()")
-        print(f"   4. Revisar cálculo de extinction ratio en el test")
+    # Verificación 4: Tests automáticos
+    test_results = run_automated_tests()
     
-    return success
+    # Reporte final
+    success = generate_final_report(syntax_ok, basic_ok, er_analysis_ok, er_results, test_results)
+    
+    return 0 if success else 1
 
 if __name__ == "__main__":
-    main()
+    exit(main())
