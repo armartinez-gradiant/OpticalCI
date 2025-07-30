@@ -152,24 +152,11 @@ class CoherentONN(BaseONN):
         return total
     
     def _initialize_parameters(self):
-        """Inicializar parámetros con valores apropiados para gradientes estables."""
+        """Inicializar parámetros con valores apropiados."""
         with torch.no_grad():
-            # Inicializar capas ópticas con valores más pequeños para estabilidad
-            for optical_layer in self.optical_layers:
-                if hasattr(optical_layer, 'reset_parameters'):
-                    optical_layer.reset_parameters()
-                
-                # Si tiene parámetros de fase, inicializar con valores pequeños
-                for name, param in optical_layer.named_parameters():
-                    if 'phase' in name.lower() or 'phi' in name.lower():
-                        # Fases pequeñas para evitar saturación inicial
-                        nn.init.uniform_(param, -0.1, 0.1)
-                    elif 'theta' in name.lower():
-                        # Ángulos de splitting pequeños
-                        nn.init.uniform_(param, -0.2, 0.2)
-            
-            # Inicializar capa final con ganancia más pequeña
-            nn.init.xavier_uniform_(self.final_layer.weight, gain=0.5)
+            # Las capas ópticas se inicializan automáticamente
+            # Solo inicializar capa final
+            nn.init.xavier_uniform_(self.final_layer.weight)
             if self.final_layer.bias is not None:
                 nn.init.zeros_(self.final_layer.bias)
     
@@ -179,7 +166,7 @@ class CoherentONN(BaseONN):
         layer_idx: int
     ) -> torch.Tensor:
         """
-        Aplicar activación óptica con gradientes estables.
+        Aplicar activación óptica mediante photodetección.
         
         Args:
             optical_signal: Señal óptica coherente [batch_size, features]
@@ -208,36 +195,10 @@ class CoherentONN(BaseONN):
         else:
             raise ValueError(f"Unknown activation type: {self.activation_type}")
         
-        # 3. Re-codificar ópticamente (MEJORADO para gradientes estables)
-        # Problema: sqrt() puede dar gradientes infinitos cerca de 0
-        # Solución: usar clamp con epsilon más alto y aplicar suavizado
-        
-        epsilon = 1e-6  # Evitar divisiones por cero en gradientes
-        activated_clamped = torch.clamp(activated, min=epsilon)
-        
-        # Alternativa más estable que sqrt puro:
-        # Usar una función suave que se comporta como sqrt pero con mejores gradientes
-        if self.training:
-            # Durante entrenamiento: función más suave
-            optical_reencoded = torch.pow(activated_clamped, 0.4)  # x^0.4 en vez de x^0.5
-        else:
-            # Durante inferencia: sqrt normal para precisión física
-            optical_reencoded = torch.sqrt(activated_clamped)
-        
-        # Normalización suave para mantener gradientes
-        current_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
-        target_power = self.optical_power
-        
-        # Normalización suave sin torch.where (mejor para gradientes)
-        power_ratio = current_power / (target_power + epsilon)
-        
-        # Usar soft clamping en lugar de hard thresholding
-        # Esto mantiene gradientes suaves en todos los casos
-        soft_clamp_factor = torch.sigmoid((power_ratio - 1.5) * 4.0)  # Suave around 1.5
-        normalization_strength = soft_clamp_factor * 0.5  # Max 50% correction
-        
-        normalization_factor = 1.0 - normalization_strength + normalization_strength * torch.sqrt(target_power / (current_power + epsilon))
-        optical_reencoded = optical_reencoded * normalization_factor
+        # 3. Re-codificar ópticamente (convertir de vuelta a campo óptico)
+        # En implementación real, esto requeriría moduladores ópticos
+        # Para simulación: sqrt(intensity) para conservar potencia
+        optical_reencoded = torch.sqrt(torch.clamp(activated, min=0.0))
         
         return optical_reencoded
     
@@ -252,24 +213,20 @@ class CoherentONN(BaseONN):
         """
         batch_size = x.size(0)
         
-        # 1. Convertir input a campo óptico (gradient-safe)
-        # Usar operaciones que mantengan gradientes suaves
-        epsilon = 1e-6
-        
-        # Normalización suave que mantiene gradientes
-        x_min = torch.min(x)
-        x_max = torch.max(x)
-        x_range = x_max - x_min + epsilon
-        
-        # Shift and scale suavemente
-        x_shifted = x - x_min + epsilon  # Ensure positive
-        x_normalized = x_shifted / (x_range + epsilon)  # [0, 1]
-        
-        # Asegurar que esté en [0, 1] de manera diferenciable
-        x_clamped = torch.sigmoid(x_normalized * 4.0 - 2.0)  # Soft clamp to [0,1]
-        
-        # Convertir a campo óptico de manera estable
-        optical_field = torch.sqrt(x_clamped * self.optical_power + epsilon)
+        # 1. Convertir input a campo óptico
+        # Para simulación: usar la raíz cuadrada para conservar potencia
+        if torch.any(x < 0):
+            # Si hay valores negativos, normalizar al rango [0, 1]
+            x_normalized = (x - torch.min(x)) / (torch.max(x) - torch.min(x) + 1e-8)
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
+        else:
+            # Normalizar al rango [0, 1] si es necesario
+            x_max = torch.max(x)
+            if x_max > 1.0:
+                x_normalized = x / x_max
+            else:
+                x_normalized = x
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
         
         # 2. Procesar a través de capas ópticas
         current_signal = optical_field
@@ -306,14 +263,6 @@ class CoherentONN(BaseONN):
         
         # 4. Capa de clasificación eléctrica final
         logits = self.final_layer(electrical_output)
-        
-        # Debug: Verificar que electrical_output mantenga gradientes
-        if self.training and electrical_output.requires_grad:
-            def hook_fn(grad):
-                if torch.any(torch.isnan(grad)):
-                    print(f"   🐛 NaN gradient detected at electrical_output")
-                return grad
-            electrical_output.register_hook(hook_fn)
         
         return logits
     

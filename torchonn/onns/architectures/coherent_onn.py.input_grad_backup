@@ -224,20 +224,21 @@ class CoherentONN(BaseONN):
             # Durante inferencia: sqrt normal para precisión física
             optical_reencoded = torch.sqrt(activated_clamped)
         
-        # Normalización suave para mantener gradientes
+        # Normalización adicional para mantener potencia óptica estable
         current_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
         target_power = self.optical_power
         
-        # Normalización suave sin torch.where (mejor para gradientes)
+        # Solo normalizar si la potencia se desvía demasiado
         power_ratio = current_power / (target_power + epsilon)
+        should_normalize = power_ratio > 2.0  # Si la potencia es > 2x el objetivo
         
-        # Usar soft clamping en lugar de hard thresholding
-        # Esto mantiene gradientes suaves en todos los casos
-        soft_clamp_factor = torch.sigmoid((power_ratio - 1.5) * 4.0)  # Suave around 1.5
-        normalization_strength = soft_clamp_factor * 0.5  # Max 50% correction
-        
-        normalization_factor = 1.0 - normalization_strength + normalization_strength * torch.sqrt(target_power / (current_power + epsilon))
-        optical_reencoded = optical_reencoded * normalization_factor
+        if torch.any(should_normalize):
+            normalization_factor = torch.where(
+                should_normalize,
+                torch.sqrt(target_power / (current_power + epsilon)),
+                torch.ones_like(power_ratio)
+            )
+            optical_reencoded = optical_reencoded * normalization_factor
         
         return optical_reencoded
     
@@ -252,24 +253,20 @@ class CoherentONN(BaseONN):
         """
         batch_size = x.size(0)
         
-        # 1. Convertir input a campo óptico (gradient-safe)
-        # Usar operaciones que mantengan gradientes suaves
-        epsilon = 1e-6
-        
-        # Normalización suave que mantiene gradientes
-        x_min = torch.min(x)
-        x_max = torch.max(x)
-        x_range = x_max - x_min + epsilon
-        
-        # Shift and scale suavemente
-        x_shifted = x - x_min + epsilon  # Ensure positive
-        x_normalized = x_shifted / (x_range + epsilon)  # [0, 1]
-        
-        # Asegurar que esté en [0, 1] de manera diferenciable
-        x_clamped = torch.sigmoid(x_normalized * 4.0 - 2.0)  # Soft clamp to [0,1]
-        
-        # Convertir a campo óptico de manera estable
-        optical_field = torch.sqrt(x_clamped * self.optical_power + epsilon)
+        # 1. Convertir input a campo óptico
+        # Para simulación: usar la raíz cuadrada para conservar potencia
+        if torch.any(x < 0):
+            # Si hay valores negativos, normalizar al rango [0, 1]
+            x_normalized = (x - torch.min(x)) / (torch.max(x) - torch.min(x) + 1e-8)
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
+        else:
+            # Normalizar al rango [0, 1] si es necesario
+            x_max = torch.max(x)
+            if x_max > 1.0:
+                x_normalized = x / x_max
+            else:
+                x_normalized = x
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
         
         # 2. Procesar a través de capas ópticas
         current_signal = optical_field
@@ -306,14 +303,6 @@ class CoherentONN(BaseONN):
         
         # 4. Capa de clasificación eléctrica final
         logits = self.final_layer(electrical_output)
-        
-        # Debug: Verificar que electrical_output mantenga gradientes
-        if self.training and electrical_output.requires_grad:
-            def hook_fn(grad):
-                if torch.any(torch.isnan(grad)):
-                    print(f"   🐛 NaN gradient detected at electrical_output")
-                return grad
-            electrical_output.register_hook(hook_fn)
         
         return logits
     
