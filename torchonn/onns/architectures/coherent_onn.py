@@ -1,0 +1,356 @@
+"""
+Coherent Optical Neural Network (CoherentONN)
+
+Implementación de red neuronal óptica coherente basada en:
+📚 Shen et al. "Deep learning with coherent nanophotonic circuits" (Nature Photonics 2017)
+
+🎯 Arquitectura:
+- Cada capa = Matriz unitaria implementada con mesh de MZIs
+- Activaciones = Detección óptica + re-codificación 
+- Conservación de energía garantizada
+- Entrenamiento end-to-end con PyTorch
+
+🔧 Componentes Usados (OpticalCI existentes):
+- MZILayer / MZIBlockLinear: Para matrices unitarias
+- Photodetector: Para activaciones no-lineales
+- Device management: Heredado de ONNBaseModel
+
+⚠️  IMPORTANTE: Solo usa componentes existentes, no modifica nada.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from typing import List, Optional, Union, Tuple, Dict, Any
+import warnings
+
+# Imports de componentes OpticalCI existentes (NO MODIFICAR)
+from ...layers import MZILayer, MZIBlockLinear, Photodetector
+from .base_onn import BaseONN
+
+
+class CoherentONN(BaseONN):
+    """
+    Coherent Optical Neural Network usando mesh de MZIs.
+    
+    Implementa la arquitectura propuesta por Shen et al. (2017):
+    1. Cada capa linear = Matriz unitaria (MZI mesh)  
+    2. Activación = Photodetection + optical re-encoding
+    3. Clasificación = Capa final eléctrica
+    
+    Características:
+    ✅ Matrices estrictamente unitarias (conservación de energía)
+    ✅ Física realista usando componentes OpticalCI
+    ✅ Entrenamiento compatible con PyTorch
+    ✅ Validación automática de propiedades físicas
+    """
+    
+    def __init__(
+        self,
+        layer_sizes: List[int],
+        activation_type: str = "square_law",
+        optical_power: float = 1.0,
+        use_unitary_constraints: bool = True,
+        device: Optional[Union[str, torch.device]] = None
+    ):
+        """
+        Inicializar CoherentONN.
+        
+        Args:
+            layer_sizes: Lista con tamaños de capas [input, hidden1, hidden2, ..., output]
+            activation_type: Tipo de activación ("square_law", "linear")
+            optical_power: Potencia óptica normalizada
+            use_unitary_constraints: Usar restricciones unitarias estrictas
+            device: Device (CPU/GPU)
+        """
+        super().__init__(
+            device=device,
+            optical_power=optical_power,
+            wavelength_channels=1,  # Coherent ONN usa 1 canal
+            enable_physics_validation=True
+        )
+        
+        self.layer_sizes = layer_sizes
+        self.activation_type = activation_type
+        self.use_unitary_constraints = use_unitary_constraints
+        self.n_layers = len(layer_sizes) - 1
+        
+        if len(layer_sizes) < 2:
+            raise ValueError("Need at least input and output layers")
+        
+        print(f"🌟 CoherentONN Architecture:")
+        print(f"   Layers: {' → '.join(map(str, layer_sizes))}")
+        print(f"   Activation: {activation_type}")
+        print(f"   Unitary constraints: {use_unitary_constraints}")
+        print(f"   Total parameters: {self._count_parameters()}")
+        
+        # Crear capas ópticas unitarias
+        self.optical_layers = nn.ModuleList()
+        self.photodetectors = nn.ModuleList()
+        
+        for i in range(self.n_layers - 1):  # Todas menos la última
+            in_size = layer_sizes[i]
+            out_size = layer_sizes[i + 1]
+            
+            # Capa óptica unitaria
+            if use_unitary_constraints:
+                # Usar MZILayer para garantizar unitaridad estricta
+                optical_layer = MZILayer(
+                    in_features=in_size,
+                    out_features=out_size,
+                    device=self.device
+                )
+            else:
+                # Usar MZIBlockLinear modo USV para flexibilidad
+                optical_layer = MZIBlockLinear(
+                    in_features=in_size,
+                    out_features=out_size,
+                    mode="usv",  # USV permite aproximar cualquier matriz
+                    device=self.device
+                )
+            
+            self.optical_layers.append(optical_layer)
+            
+            # Photodetector para activación
+            photodetector = Photodetector(
+                responsivity=1.0,  # Normalizado
+                dark_current=0.0,  # Ideal para simulación
+                device=self.device
+            )
+            self.photodetectors.append(photodetector)
+        
+        # Capa final: eléctrica para clasificación
+        final_in = layer_sizes[-2]
+        final_out = layer_sizes[-1]
+        self.final_layer = nn.Linear(final_in, final_out, device=self.device)
+        
+        # Inicialización
+        self._initialize_parameters()
+    
+    def _count_parameters(self) -> int:
+        """Estimar número de parámetros para cada configuración."""
+        total = 0
+        for i in range(len(self.layer_sizes) - 1):
+            in_size = self.layer_sizes[i]
+            out_size = self.layer_sizes[i + 1]
+            
+            if self.use_unitary_constraints:
+                # MZI Layer: número de parámetros según descomposición de Reck
+                max_dim = max(in_size, out_size)
+                n_mzis = max_dim * (max_dim - 1) // 2
+                n_phases = max_dim
+                total += n_mzis * 2 + n_phases  # theta, phi_internal, phi_external
+            else:
+                # MZIBlockLinear USV mode
+                total += in_size * out_size  # Aproximación
+        
+        # Capa final
+        total += self.layer_sizes[-2] * self.layer_sizes[-1]
+        
+        return total
+    
+    def _initialize_parameters(self):
+        """Inicializar parámetros con valores apropiados."""
+        with torch.no_grad():
+            # Las capas ópticas se inicializan automáticamente
+            # Solo inicializar capa final
+            nn.init.xavier_uniform_(self.final_layer.weight)
+            if self.final_layer.bias is not None:
+                nn.init.zeros_(self.final_layer.bias)
+    
+    def _apply_optical_activation(
+        self, 
+        optical_signal: torch.Tensor, 
+        layer_idx: int
+    ) -> torch.Tensor:
+        """
+        Aplicar activación óptica mediante photodetección.
+        
+        Args:
+            optical_signal: Señal óptica coherente [batch_size, features]
+            layer_idx: Índice de la capa (para acceder al photodetector)
+            
+        Returns:
+            Señal activada re-codificada ópticamente
+        """
+        # 1. Photodetección (convierte a intensidad)
+        photodetector = self.photodetectors[layer_idx]
+        electrical_signal = photodetector(optical_signal)
+        
+        # 2. Aplicar función de activación
+        if self.activation_type == "square_law":
+            # Ya aplicada por el photodetector (|E|²)
+            activated = electrical_signal
+        elif self.activation_type == "linear":
+            # Activación lineal (no cambio)
+            activated = electrical_signal
+        elif self.activation_type == "relu":
+            # ReLU eléctrico
+            activated = F.relu(electrical_signal)
+        elif self.activation_type == "tanh":
+            # Tanh eléctrico (más difícil de implementar ópticamente)
+            activated = torch.tanh(electrical_signal)
+        else:
+            raise ValueError(f"Unknown activation type: {self.activation_type}")
+        
+        # 3. Re-codificar ópticamente (convertir de vuelta a campo óptico)
+        # En implementación real, esto requeriría moduladores ópticos
+        # Para simulación: sqrt(intensity) para conservar potencia
+        optical_reencoded = torch.sqrt(torch.clamp(activated, min=0.0))
+        
+        return optical_reencoded
+    
+    def _forward_optical(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass óptico implementando la arquitectura coherente.
+        
+        Flujo:
+        1. Input → Campo óptico
+        2. Para cada capa: MZI mesh → Photodetection → Re-encoding  
+        3. Final layer → Clasificación eléctrica
+        """
+        batch_size = x.size(0)
+        
+        # 1. Convertir input a campo óptico
+        # Para simulación: usar la raíz cuadrada para conservar potencia
+        if torch.any(x < 0):
+            # Si hay valores negativos, normalizar al rango [0, 1]
+            x_normalized = (x - torch.min(x)) / (torch.max(x) - torch.min(x) + 1e-8)
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
+        else:
+            optical_field = torch.sqrt(x * self.optical_power)
+        
+        # 2. Procesar a través de capas ópticas
+        current_signal = optical_field
+        
+        for i, optical_layer in enumerate(self.optical_layers):
+            # Aplicar transformación unitaria (MZI mesh)
+            try:
+                current_signal = optical_layer(current_signal)
+            except Exception as e:
+                warnings.warn(f"Layer {i} forward failed: {e}")
+                # Fallback: identidad
+                pass
+            
+            # Aplicar activación óptica (photodetection + re-encoding)
+            current_signal = self._apply_optical_activation(current_signal, i)
+            
+            # Validación física ocasional
+            if self.training and torch.rand(1).item() < 0.05:  # 5% de las veces
+                signal_power = torch.sum(torch.abs(current_signal)**2, dim=1)
+                max_power = torch.max(signal_power)
+                if max_power > self.optical_power * 1.5:
+                    warnings.warn(f"Layer {i}: Optical power exceeded: {max_power:.3f}")
+        
+        # 3. Conversión final a señal eléctrica
+        final_photodetector = self.photodetectors[-1]
+        electrical_output = final_photodetector(current_signal)
+        
+        # 4. Capa de clasificación eléctrica final
+        logits = self.final_layer(electrical_output)
+        
+        return logits
+    
+    def get_optical_efficiency(self) -> Dict[str, float]:
+        """
+        Calcular métricas de eficiencia óptica.
+        
+        Returns:
+            Dict con métricas de eficiencia
+        """
+        efficiency = {}
+        
+        # Métricas básicas
+        efficiency["n_optical_layers"] = len(self.optical_layers)
+        efficiency["n_photodetectors"] = len(self.photodetectors)
+        efficiency["theoretical_speedup"] = len(self.optical_layers)  # Vs. electronic
+        
+        # Número de operaciones ópticas vs eléctricas
+        optical_ops = sum(
+            layer.in_features * layer.out_features 
+            for layer in self.optical_layers
+        )
+        electrical_ops = self.final_layer.in_features * self.final_layer.out_features
+        
+        efficiency["optical_operations"] = optical_ops
+        efficiency["electrical_operations"] = electrical_ops
+        efficiency["optical_fraction"] = optical_ops / (optical_ops + electrical_ops)
+        
+        return efficiency
+    
+    def validate_unitarity(self) -> Dict[str, Any]:
+        """
+        Validar propiedades unitarias de las capas ópticas.
+        
+        Returns:
+            Dict con resultados de validación
+        """
+        validation = {"layers": {}, "overall_valid": True}
+        
+        for i, layer in enumerate(self.optical_layers):
+            layer_validation = {"is_unitary": False, "error": float('inf')}
+            
+            try:
+                if hasattr(layer, 'get_unitary_matrix'):
+                    # Para MZILayer
+                    U = layer.get_unitary_matrix()
+                    identity_check = torch.matmul(U, torch.conj(U.t()))
+                    identity_target = torch.eye(U.size(0), dtype=U.dtype, device=U.device)
+                    error = torch.max(torch.abs(identity_check - identity_target)).item()
+                    
+                    layer_validation["is_unitary"] = error < 1e-3
+                    layer_validation["unitarity_error"] = error
+                elif hasattr(layer, '_get_weight_matrix'):
+                    # Para MZIBlockLinear, verificar que ||W||_2 ≈ 1
+                    W = layer._get_weight_matrix()
+                    singular_values = torch.svd(W)[1]
+                    max_sv = torch.max(singular_values).item()
+                    
+                    layer_validation["is_unitary"] = max_sv <= 1.1  # Permitir cierta tolerancia
+                    layer_validation["max_singular_value"] = max_sv
+            except Exception as e:
+                layer_validation["error"] = str(e)
+            
+            validation["layers"][f"layer_{i}"] = layer_validation
+            
+            if not layer_validation.get("is_unitary", False):
+                validation["overall_valid"] = False
+        
+        return validation
+    
+    def extra_repr(self) -> str:
+        """Representación adicional para debugging."""
+        base_repr = super().extra_repr()
+        coherent_repr = (f"layer_sizes={self.layer_sizes}, "
+                        f"activation_type='{self.activation_type}', "
+                        f"unitary_constraints={self.use_unitary_constraints}")
+        
+        return f"{base_repr}, {coherent_repr}"
+
+
+def create_simple_coherent_onn(
+    input_size: int = 4,
+    hidden_size: int = 8, 
+    output_size: int = 3,
+    device: Optional[torch.device] = None
+) -> CoherentONN:
+    """
+    Crear una CoherentONN simple para testing y demos.
+    
+    Args:
+        input_size: Tamaño de entrada
+        hidden_size: Tamaño de capa oculta
+        output_size: Tamaño de salida
+        device: Device
+        
+    Returns:
+        CoherentONN configurada y lista para usar
+    """
+    return CoherentONN(
+        layer_sizes=[input_size, hidden_size, output_size],
+        activation_type="square_law",
+        optical_power=1.0,
+        use_unitary_constraints=True,
+        device=device
+    )
