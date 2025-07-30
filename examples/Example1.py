@@ -149,9 +149,12 @@ class PhotonicSimulationDemo:
         
         print(f"📊 Validación Física Automática v5.3:")
         print(f"   Energy conservation: {validation['energy_conserved']} ({validation['energy_conservation']:.3f}, max: {validation.get('max_energy', 0):.3f})")
-        print(f"   Expected range: {validation['expected_conservation']:.3f} - 1.0")
+        print(f"   Energy range: {validation['energy_conservation']:.3f} - 1.0")
         print(f"   Extinction coherent: {validation['extinction_ratio_coherent']} ({validation['extinction_ratio_measured_db']:.1f} vs {validation['extinction_ratio_theory_db']:.1f} dB)")
-        print(f"   ER error: {validation.get('er_error', 0):.1f} dB (tolerancia: ±{validation.get('er_tolerance_used', 0):.1f} dB)")
+        er_measured = validation['extinction_ratio_measured_db']
+        er_theory = validation['extinction_ratio_theory_db'] 
+        er_error = abs(er_measured - er_theory)
+        print(f"   ER error: {er_error:.1f} dB (medido: {er_measured:.1f}, teórico: {er_theory:.1f})")
         print(f"   Resonance centered: {validation['resonance_centered']} ({validation['resonance_wavelength_nm']:.3f} nm)")
         print(f"   Q factor coherent: {validation.get('q_factor_coherent', False)} (Q_measured: {validation.get('q_factor_measured', 'N/A')})")
         

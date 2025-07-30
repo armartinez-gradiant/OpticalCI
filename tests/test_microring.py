@@ -110,8 +110,7 @@ class TestMicroringResonator:
         through_response = output['through'][0]
 
         # ✅ DIAGNÓSTICO DETALLADO
-        print(f"
-🔍 DIAGNÓSTICO Extinction Ratio v5.5:")
+        print(f"\n🔍 DIAGNÓSTICO Extinction Ratio v5.5:")
         print(f"   Through response range: {torch.min(through_response):.6f} - {torch.max(through_response):.6f}")
         print(f"   Through response mean: {torch.mean(through_response):.6f}")
         print(f"   Through response std: {torch.std(through_response):.6f}")
