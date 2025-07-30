@@ -27,7 +27,7 @@ import warnings
 
 # Import de la arquitectura ONN
 try:
-    from ..architectures import CoherentONN, create_simple_coherent_onn
+    from ..architectures.coherent_onn import CoherentONN, create_simple_coherent_onn
     COHERENT_AVAILABLE = True
 except ImportError:
     COHERENT_AVAILABLE = False

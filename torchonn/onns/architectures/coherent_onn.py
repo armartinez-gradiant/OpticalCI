@@ -75,6 +75,7 @@ class CoherentONN(BaseONN):
         self.activation_type = activation_type
         self.use_unitary_constraints = use_unitary_constraints
         self.n_layers = len(layer_sizes) - 1
+        self.input_size = layer_sizes[0]  # Para energy conservation calculations
         
         if len(layer_sizes) < 2:
             raise ValueError("Need at least input and output layers")
@@ -219,7 +220,7 @@ class CoherentONN(BaseONN):
         # Usar una función suave que se comporta como sqrt pero con mejores gradientes
         if self.training:
             # Durante entrenamiento: función más suave
-            optical_reencoded = torch.pow(activated_clamped, 0.4)  # x^0.4 en vez de x^0.5
+            optical_reencoded = torch.sqrt(activated_clamped + 1e-8)  # Más epsilon para estabilidad
         else:
             # Durante inferencia: sqrt normal para precisión física
             optical_reencoded = torch.sqrt(activated_clamped)
@@ -228,15 +229,28 @@ class CoherentONN(BaseONN):
         current_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
         target_power = self.optical_power
         
-        # Normalización suave sin torch.where (mejor para gradientes)
-        power_ratio = current_power / (target_power + epsilon)
+        # IMPROVED: Conservación explícita de energía
+        # Calcular pérdida de energía esperada en photodetection y compensar
+        input_power = torch.sum(optical_signal**2, dim=1, keepdim=True)
         
-        # Usar soft clamping en lugar de hard thresholding
-        # Esto mantiene gradientes suaves en todos los casos
-        soft_clamp_factor = torch.sigmoid((power_ratio - 1.5) * 4.0)  # Suave around 1.5
-        normalization_strength = soft_clamp_factor * 0.5  # Max 50% correction
+        # Factor de corrección para compensar pérdidas sistemáticas
+        # El proceso de photodetection + sqrt pierde energía, necesitamos compensar
+        energy_correction_factor = torch.sqrt(input_power / (current_power + epsilon))
+        energy_correction_factor = torch.clamp(energy_correction_factor, 0.1, 10.0)  # Reasonable bounds
         
-        normalization_factor = 1.0 - normalization_strength + normalization_strength * torch.sqrt(target_power / (current_power + epsilon))
+        # Aplicar corrección de energía
+        optical_reencoded = optical_reencoded * energy_correction_factor
+        
+        # Normalización final suave si la potencia excede límites razonables
+        final_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
+        max_allowed_power = input_power * 1.2  # Allow 20% increase
+        
+        normalization_needed = final_power > max_allowed_power
+        normalization_factor = torch.where(
+            normalization_needed,
+            torch.sqrt(max_allowed_power / (final_power + epsilon)),
+            torch.ones_like(final_power)
+        )
         optical_reencoded = optical_reencoded * normalization_factor
         
         return optical_reencoded
@@ -256,20 +270,20 @@ class CoherentONN(BaseONN):
         # Usar operaciones que mantengan gradientes suaves
         epsilon = 1e-6
         
-        # Normalización suave que mantiene gradientes
-        x_min = torch.min(x)
-        x_max = torch.max(x)
-        x_range = x_max - x_min + epsilon
+        # IMPROVED: Normalización que conserva energía mejor
+        # Usar RMS normalization en lugar de min-max para conservar energía
+        x_rms = torch.sqrt(torch.mean(x**2, dim=1, keepdim=True) + epsilon)
+        x_normalized = x / (x_rms + epsilon)  # Normalize by RMS
         
-        # Shift and scale suavemente
-        x_shifted = x - x_min + epsilon  # Ensure positive
-        x_normalized = x_shifted / (x_range + epsilon)  # [0, 1]
+        # Aplicar offset para asegurar valores positivos
+        x_offset = x_normalized + 1.0  # Shift to [0, 2] approx
+        x_scaled = x_offset / 2.0      # Scale to [0, 1]
         
-        # Asegurar que esté en [0, 1] de manera diferenciable
-        x_clamped = torch.sigmoid(x_normalized * 4.0 - 2.0)  # Soft clamp to [0,1]
-        
-        # Convertir a campo óptico de manera estable
-        optical_field = torch.sqrt(x_clamped * self.optical_power + epsilon)
+        # Convertir a campo óptico conservando energía total
+        target_total_power = self.input_size * self.optical_power  # Total power budget
+        current_power = torch.sum(x_scaled, dim=1, keepdim=True)
+        power_factor = torch.sqrt(target_total_power / (current_power + epsilon))
+        optical_field = torch.sqrt(x_scaled + epsilon) * power_factor
         
         # 2. Procesar a través de capas ópticas
         current_signal = optical_field
@@ -304,7 +318,11 @@ class CoherentONN(BaseONN):
             warnings.warn("No photodetectors available, using intensity conversion")
             electrical_output = torch.abs(current_signal)**2
         
-        # 4. Capa de clasificación eléctrica final
+        # 4. Capa de clasificación eléctrica final con protección NaN
+        # Proteger contra NaN/Inf en electrical_output
+        electrical_output = torch.nan_to_num(electrical_output, nan=0.0, posinf=1.0, neginf=0.0)
+        electrical_output = torch.clamp(electrical_output, min=0.0, max=10.0)  # Reasonable bounds
+        
         logits = self.final_layer(electrical_output)
         
         # Debug: Verificar que electrical_output mantenga gradientes
