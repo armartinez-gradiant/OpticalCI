@@ -89,30 +89,31 @@ class CoherentONN(BaseONN):
         self.optical_layers = nn.ModuleList()
         self.photodetectors = nn.ModuleList()
         
-        for i in range(self.n_layers - 1):  # Todas menos la última
+        for i in range(self.n_layers):  # CORRECCIÓN: Todas las capas incluyendo la última
             in_size = layer_sizes[i]
             out_size = layer_sizes[i + 1]
             
-            # Capa óptica unitaria
-            if use_unitary_constraints:
-                # Usar MZILayer para garantizar unitaridad estricta
-                optical_layer = MZILayer(
-                    in_features=in_size,
-                    out_features=out_size,
-                    device=self.device
-                )
-            else:
-                # Usar MZIBlockLinear modo USV para flexibilidad
-                optical_layer = MZIBlockLinear(
-                    in_features=in_size,
-                    out_features=out_size,
-                    mode="usv",  # USV permite aproximar cualquier matriz
-                    device=self.device
-                )
+            # Capa óptica unitaria (solo para capas intermedias)
+            if i < self.n_layers - 1:
+                if use_unitary_constraints:
+                    # Usar MZILayer para garantizar unitaridad estricta
+                    optical_layer = MZILayer(
+                        in_features=in_size,
+                        out_features=out_size,
+                        device=self.device
+                    )
+                else:
+                    # Usar MZIBlockLinear modo USV para flexibilidad
+                    optical_layer = MZIBlockLinear(
+                        in_features=in_size,
+                        out_features=out_size,
+                        mode="usv",  # USV permite aproximar cualquier matriz
+                        device=self.device
+                    )
+                
+                self.optical_layers.append(optical_layer)
             
-            self.optical_layers.append(optical_layer)
-            
-            # Photodetector para activación
+            # Photodetector para TODAS las capas (incluyendo la final)
             photodetector = Photodetector(
                 responsivity=1.0,  # Normalizado
                 dark_current=0.0,  # Ideal para simulación
@@ -219,18 +220,25 @@ class CoherentONN(BaseONN):
             x_normalized = (x - torch.min(x)) / (torch.max(x) - torch.min(x) + 1e-8)
             optical_field = torch.sqrt(x_normalized * self.optical_power)
         else:
-            optical_field = torch.sqrt(x * self.optical_power)
+            # Normalizar al rango [0, 1] si es necesario
+            x_max = torch.max(x)
+            if x_max > 1.0:
+                x_normalized = x / x_max
+            else:
+                x_normalized = x
+            optical_field = torch.sqrt(x_normalized * self.optical_power)
         
         # 2. Procesar a través de capas ópticas
         current_signal = optical_field
         
+        # Procesar capas intermedias con MZI + activación
         for i, optical_layer in enumerate(self.optical_layers):
             # Aplicar transformación unitaria (MZI mesh)
             try:
                 current_signal = optical_layer(current_signal)
             except Exception as e:
                 warnings.warn(f"Layer {i} forward failed: {e}")
-                # Fallback: identidad
+                # Fallback: mantener señal sin cambio
                 pass
             
             # Aplicar activación óptica (photodetection + re-encoding)
@@ -243,9 +251,15 @@ class CoherentONN(BaseONN):
                 if max_power > self.optical_power * 1.5:
                     warnings.warn(f"Layer {i}: Optical power exceeded: {max_power:.3f}")
         
-        # 3. Conversión final a señal eléctrica
-        final_photodetector = self.photodetectors[-1]
-        electrical_output = final_photodetector(current_signal)
+        # 3. Conversión final a señal eléctrica usando el último photodetector
+        # CORRECCIÓN: Verificar que existe el photodetector
+        if len(self.photodetectors) > 0:
+            final_photodetector = self.photodetectors[-1]
+            electrical_output = final_photodetector(current_signal)
+        else:
+            # Fallback si no hay photodetectors (no debería pasar)
+            warnings.warn("No photodetectors available, using intensity conversion")
+            electrical_output = torch.abs(current_signal)**2
         
         # 4. Capa de clasificación eléctrica final
         logits = self.final_layer(electrical_output)

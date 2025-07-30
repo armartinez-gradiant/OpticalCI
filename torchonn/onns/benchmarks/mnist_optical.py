@@ -550,6 +550,15 @@ def run_quick_demo(image_size: int = 4, n_epochs: int = 5) -> Dict[str, Any]:
     return results
 
 
+
+# Alias para compatibilidad con tests
+OpticalMNISTBenchmark = OpticalMNIST
+
+def create_optical_mnist_benchmark(**kwargs):
+    """Factory function para crear benchmark."""
+    return OpticalMNIST(**kwargs)
+
+
 if __name__ == "__main__":
     # Demo básico
     results = run_quick_demo(image_size=4, n_epochs=3)
