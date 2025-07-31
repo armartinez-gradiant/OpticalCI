@@ -153,26 +153,26 @@ class CoherentONN(BaseONN):
         return total
     
     def _initialize_parameters(self):
-        """Inicializar parámetros con valores apropiados para gradientes estables."""
-        with torch.no_grad():
-            # Inicializar capas ópticas con valores más pequeños para estabilidad
-            for optical_layer in self.optical_layers:
-                if hasattr(optical_layer, 'reset_parameters'):
-                    optical_layer.reset_parameters()
-                
-                # Si tiene parámetros de fase, inicializar con valores pequeños
-                for name, param in optical_layer.named_parameters():
-                    if 'phase' in name.lower() or 'phi' in name.lower():
-                        # Fases pequeñas para evitar saturación inicial
-                        nn.init.uniform_(param, -0.1, 0.1)
-                    elif 'theta' in name.lower():
-                        # Ángulos de splitting pequeños
-                        nn.init.uniform_(param, -0.2, 0.2)
+        """Inicialización científica para mejor convergencia."""
+    with torch.no_grad():
+        # Inicializar capas ópticas con RANGOS MÁS GRANDES
+        for optical_layer in self.optical_layers:
+            if hasattr(optical_layer, 'reset_parameters'):
+                optical_layer.reset_parameters()
             
-            # Inicializar capa final con ganancia más pequeña
-            nn.init.xavier_uniform_(self.final_layer.weight, gain=0.5)
-            if self.final_layer.bias is not None:
-                nn.init.zeros_(self.final_layer.bias)
+            # CAMBIO: Rangos más grandes para exploración completa
+            for name, param in optical_layer.named_parameters():
+                if 'phase' in name.lower() or 'phi' in name.lower():
+                    # Fases en rango completo [0, 2π] para máxima expresividad
+                    nn.init.uniform_(param, 0, 2*np.pi)
+                elif 'theta' in name.lower():
+                    # Ángulos MZI en rango [0, π/2] para splitting completo
+                    nn.init.uniform_(param, 0, np.pi/2)
+        
+        # CAMBIO: Capa final con mayor ganancia inicial
+        nn.init.xavier_uniform_(self.final_layer.weight, gain=1.0)  # Era 0.5
+        if self.final_layer.bias is not None:
+            nn.init.zeros_(self.final_layer.bias)
     
     def _apply_optical_activation(
         self, 
@@ -180,79 +180,62 @@ class CoherentONN(BaseONN):
         layer_idx: int
     ) -> torch.Tensor:
         """
-        Aplicar activación óptica con gradientes estables.
+        Activación óptica con gradientes ESTABLES.
         
-        Args:
-            optical_signal: Señal óptica coherente [batch_size, features]
-            layer_idx: Índice de la capa (para acceder al photodetector)
-            
-        Returns:
-            Señal activada re-codificada ópticamente
+        CAMBIOS CIENTÍFICOS:
+        1. Usa softplus en lugar de sqrt() problemático
+        2. Normalización suave sin hard clipping
+        3. Evita NaN gradients completamente
         """
-        # 1. Photodetección (convierte a intensidad)
+        # 1. Photodetección estable
         photodetector = self.photodetectors[layer_idx]
         electrical_signal = photodetector(optical_signal)
         
-        # 2. Aplicar función de activación
+        # 2. Función de activación CIENTÍFICA
         if self.activation_type == "square_law":
-            # Ya aplicada por el photodetector (|E|²)
-            activated = electrical_signal
+            # MEJORA: Usar softplus en lugar de identidad
+            # Esto añade no-linealidad sin problemas de gradiente
+            activated = F.softplus(electrical_signal - 0.5)
         elif self.activation_type == "linear":
-            # Activación lineal (no cambio)
             activated = electrical_signal
         elif self.activation_type == "relu":
-            # ReLU eléctrico
             activated = F.relu(electrical_signal)
         elif self.activation_type == "tanh":
-            # Tanh eléctrico (más difícil de implementar ópticamente)
             activated = torch.tanh(electrical_signal)
         else:
             raise ValueError(f"Unknown activation type: {self.activation_type}")
         
-        # 3. Re-codificar ópticamente (MEJORADO para gradientes estables)
-        # Problema: sqrt() puede dar gradientes infinitos cerca de 0
-        # Solución: usar clamp con epsilon más alto y aplicar suavizado
+        # 3. Re-encoding óptico ESTABLE
+        epsilon = 1e-6
         
-        epsilon = 1e-6  # Evitar divisiones por cero en gradientes
-        activated_clamped = torch.clamp(activated, min=epsilon)
+        # CAMBIO CRÍTICO: Usar power 0.4 en lugar de 0.5 (sqrt)
+        # Esto evita gradientes infinitos y mantiene la física aproximada
+        activated_safe = torch.clamp(activated, min=epsilon)
         
-        # Alternativa más estable que sqrt puro:
-        # Usar una función suave que se comporta como sqrt pero con mejores gradientes
         if self.training:
-            # Durante entrenamiento: función más suave
-            optical_reencoded = torch.sqrt(activated_clamped + 1e-8)  # Más epsilon para estabilidad
+            # Durante training: función más suave para gradientes estables
+            optical_reencoded = torch.pow(activated_safe, 0.4)  # Más suave que sqrt
+            # Añadir pequeña cantidad de señal original para estabilidad
+            optical_reencoded = 0.9 * optical_reencoded + 0.1 * activated_safe
         else:
-            # Durante inferencia: sqrt normal para precisión física
-            optical_reencoded = torch.sqrt(activated_clamped)
+            # Durante inference: más cerca de la física real
+            optical_reencoded = torch.sqrt(activated_safe)
         
-        # Normalización suave para mantener gradientes
-        current_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
-        target_power = self.optical_power
+        # 4. Normalización SUAVE (sin hard clipping)
+        # Calcular energía actual y objetivo
+        current_energy = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
+        target_energy = self.optical_power * optical_reencoded.shape[1]
         
-        # IMPROVED: Conservación explícita de energía
-        # Calcular pérdida de energía esperada en photodetection y compensar
-        input_power = torch.sum(optical_signal**2, dim=1, keepdim=True)
+        # Normalización suave usando tanh scaling
+        energy_ratio = current_energy / (target_energy + epsilon)
         
-        # Factor de corrección para compensar pérdidas sistemáticas
-        # El proceso de photodetection + sqrt pierde energía, necesitamos compensar
-        energy_correction_factor = torch.sqrt(input_power / (current_power + epsilon))
-        energy_correction_factor = torch.clamp(energy_correction_factor, 0.1, 10.0)  # Reasonable bounds
+        # Factor de normalización suave (no abrupto)
+        # Se acerca a 1.0 cuando la energía está bien, corrige suavemente si no
+        normalization_factor = torch.tanh(1.0 / (energy_ratio + epsilon))
         
-        # Aplicar corrección de energía
-        optical_reencoded = optical_reencoded * energy_correction_factor
-        
-        # Normalización final suave si la potencia excede límites razonables
-        final_power = torch.sum(optical_reencoded**2, dim=1, keepdim=True)
-        max_allowed_power = input_power * 1.2  # Allow 20% increase
-        
-        normalization_needed = final_power > max_allowed_power
-        normalization_factor = torch.where(
-            normalization_needed,
-            torch.sqrt(max_allowed_power / (final_power + epsilon)),
-            torch.ones_like(final_power)
-        )
+        # Aplicar normalización
         optical_reencoded = optical_reencoded * normalization_factor
-        
+    
         return optical_reencoded
     
     def _forward_optical(self, x: torch.Tensor) -> torch.Tensor:

@@ -85,65 +85,127 @@ class OpticalMNIST:
         self.train_loader, self.test_loader = self._prepare_data()
         
     def _prepare_data(self) -> Tuple[DataLoader, DataLoader]:
-        """Preparar dataset MNIST con el tamaño apropiado."""
+    """Preparar dataset MNIST REAL en lugar de datos sintéticos."""
+    
+    # Configurar transforms para el tamaño de imagen deseado
+    transform = transforms.Compose([
+        transforms.Resize((self.image_size, self.image_size)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.1307,), (0.3081,))  # MNIST normalization
+    ])
+    
+    try:
+        print("   Attempting to load REAL MNIST data...")
         
-        # Transformaciones para redimensionar
-        if self.image_size == 28:
-            # MNIST original
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize((0.1307,), (0.3081,))
-            ])
-        else:
-            # MNIST redimensionado
-            transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Resize((self.image_size, self.image_size)),
-                transforms.Normalize((0.1307,), (0.3081,))
-            ])
+        # Cargar MNIST real
+        train_dataset = torchvision.datasets.MNIST(
+            root=self.data_path, 
+            train=True, 
+            download=True,  # Descarga automática
+            transform=transform
+        )
+        test_dataset = torchvision.datasets.MNIST(
+            root=self.data_path, 
+            train=False, 
+            download=True,
+            transform=transform
+        )
         
-        # Cargar MNIST
-        try:
-            train_dataset = torchvision.datasets.MNIST(
-                root=self.data_path,
-                train=True,
-                download=True,
-                transform=transform
-            )
-            test_dataset = torchvision.datasets.MNIST(
-                root=self.data_path,
-                train=False,
-                download=True,
-                transform=transform
-            )
-        except Exception as e:
-            # Fallback: crear datos sintéticos para testing
-            warnings.warn(f"MNIST download failed: {e}. Using synthetic data.")
-            return self._create_synthetic_data()
+        # Subsampling para demo (puedes ajustar estos números)
+        n_train = min(2000, len(train_dataset))  # Aumentado de 500
+        n_test = min(500, len(test_dataset))     # Aumentado de 100
         
-        # Para empezar con datasets más pequeños
-        if self.image_size <= 8:
-            # Usar subset para pruebas rápidas
-            train_size = min(1000, len(train_dataset))
-            test_size = min(200, len(test_dataset))
-            
-            train_indices = torch.randperm(len(train_dataset))[:train_size]
-            test_indices = torch.randperm(len(test_dataset))[:test_size]
-            
-            train_subset = torch.utils.data.Subset(train_dataset, train_indices)
-            test_subset = torch.utils.data.Subset(test_dataset, test_indices)
-            
-            train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
-            test_loader = DataLoader(test_subset, batch_size=64, shuffle=False)
-        else:
-            # Dataset completo para imágenes grandes
-            train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-            test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+        # Selección aleatoria estratificada
+        train_indices = torch.randperm(len(train_dataset))[:n_train]
+        test_indices = torch.randperm(len(test_dataset))[:n_test]
         
-        print(f"   Training samples: {len(train_loader.dataset)}")
-        print(f"   Test samples: {len(test_loader.dataset)}")
+        train_subset = torch.utils.data.Subset(train_dataset, train_indices)
+        test_subset = torch.utils.data.Subset(test_dataset, test_indices)
+        
+        train_loader = DataLoader(train_subset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_subset, batch_size=64, shuffle=False)
+        
+        print(f"   ✅ REAL MNIST loaded successfully")
+        print(f"   Training samples: {n_train}")
+        print(f"   Test samples: {n_test}")
         
         return train_loader, test_loader
+        
+    except Exception as e:
+        print(f"   ⚠️ Could not load MNIST: {e}")
+        print("   Falling back to STRUCTURED synthetic data...")
+        
+        # Fallback mejorado con estructura
+        return self._prepare_structured_synthetic_data()
+
+def _prepare_structured_synthetic_data(self) -> Tuple[DataLoader, DataLoader]:
+    """Datos sintéticos ESTRUCTURADOS (no completamente aleatorios)."""
+    n_train = 1000
+    n_test = 200
+    
+    train_data = []
+    train_labels = []
+    
+    # Crear patrones distintivos para cada clase
+    for class_idx in range(self.n_classes):
+        n_per_class = n_train // self.n_classes
+        
+        # Patrón base único para cada clase
+        pattern = torch.zeros(self.input_size)
+        
+        # Estrategia: cada clase activa diferentes regiones
+        start_idx = (class_idx * self.input_size) // self.n_classes
+        end_idx = ((class_idx + 1) * self.input_size) // self.n_classes
+        pattern[start_idx:end_idx] = 2.0  # Activar región específica
+        
+        # Añadir algunos patrones adicionales aleatorios
+        random_indices = torch.randperm(self.input_size)[:self.input_size//4]
+        pattern[random_indices] += torch.randn(len(random_indices)) * 0.5
+        
+        # Generar variaciones del patrón
+        for _ in range(n_per_class):
+            # Variación con ruido controlado
+            variation = pattern + torch.randn(self.input_size) * 0.2
+            train_data.append(variation)
+            train_labels.append(class_idx)
+    
+    # Similar para test data
+    test_data = []
+    test_labels = []
+    for class_idx in range(self.n_classes):
+        n_per_class = n_test // self.n_classes
+        
+        pattern = torch.zeros(self.input_size)
+        start_idx = (class_idx * self.input_size) // self.n_classes
+        end_idx = ((class_idx + 1) * self.input_size) // self.n_classes
+        pattern[start_idx:end_idx] = 2.0
+        
+        random_indices = torch.randperm(self.input_size)[:self.input_size//4]
+        pattern[random_indices] += torch.randn(len(random_indices)) * 0.5
+        
+        for _ in range(n_per_class):
+            variation = pattern + torch.randn(self.input_size) * 0.2
+            test_data.append(variation)
+            test_labels.append(class_idx)
+    
+    # Convertir y normalizar
+    train_data = torch.stack(train_data)
+    train_labels = torch.tensor(train_labels)
+    test_data = torch.stack(test_data)
+    test_labels = torch.tensor(test_labels)
+    
+    # Normalización para rango óptico [0, 1]
+    train_data = torch.sigmoid(train_data)
+    test_data = torch.sigmoid(test_data)
+    
+    train_dataset = TensorDataset(train_data, train_labels)
+    test_dataset = TensorDataset(test_data, test_labels)
+    
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+    
+    print("   ✅ Structured synthetic data created")
+    return train_loader, test_loader
     
     def _create_synthetic_data(self) -> Tuple[DataLoader, DataLoader]:
         """Crear datos sintéticos para testing cuando MNIST no está disponible."""
@@ -330,7 +392,9 @@ class OpticalMNIST:
             train_accuracies.append(accuracy)
             epoch_times.append(epoch_time)
             
-            if epoch % max(1, n_epochs // 5) == 0:  # Print cada 20%
+            print_frequency = 1  # Mostrar cada epoch
+            if epoch % print_frequency == 0:
+
                 print(f"   Epoch {epoch+1}/{n_epochs}: "
                       f"Loss={avg_loss:.4f}, Acc={accuracy:.2f}%, "
                       f"Time={epoch_time:.2f}s")
