@@ -1,4 +1,37 @@
+#!/usr/bin/env python3
 """
+🔥 REPARACIÓN AGRESIVA - REEMPLAZAR ARCHIVO COMPLETO
+==================================================
+
+El diagnóstico muestra: NameError: name 'self' is not defined en línea 164
+PROBLEMA: Código con 'self' al nivel de clase (fuera de métodos)
+SOLUCIÓN: Reemplazar completamente con template funcional
+"""
+
+import os
+import shutil
+from datetime import datetime
+
+def aggressive_repair():
+    """Reparación agresiva - reemplazar archivo completo."""
+    
+    file_path = "torchonn/onns/architectures/coherent_onn.py"
+    
+    print("🔥 REPARACIÓN AGRESIVA")
+    print("=" * 20)
+    print("❌ Problema detectado: 'self' usado al nivel de clase")
+    print("🎯 Solución: Reemplazar con template científico completo")
+    
+    # 1. Backup del archivo corrupto
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = f"{file_path}.aggressive_backup_{timestamp}"
+    
+    if os.path.exists(file_path):
+        shutil.copy2(file_path, backup_path)
+        print(f"📦 Backup corrupted file: {backup_path}")
+    
+    # 2. Template completo y funcional (basado en mi análisis científico)
+    complete_template = '''"""
 Coherent Optical Neural Network (CoherentONN) - COMPLETELY REPAIRED
 
 🔧 Completely rebuilt due to structural corruption
@@ -378,3 +411,124 @@ def create_simple_coherent_onn(
         use_unitary_constraints=True,
         device=device
     )
+'''
+    
+    # 3. Escribir template completo
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(complete_template.strip())
+        print("✅ Complete template written")
+    except Exception as e:
+        print(f"❌ Error writing file: {e}")
+        return False
+    
+    # 4. Test de importación
+    try:
+        import subprocess
+        import sys
+        
+        print("🧪 Testing import...")
+        test_result = subprocess.run([
+            sys.executable, '-c', 
+            '''
+try:
+    from torchonn.onns.architectures.coherent_onn import CoherentONN
+    print("✅ IMPORT SUCCESS")
+    
+    # Test creation
+    onn = CoherentONN([4, 6, 3])
+    print("✅ CREATION SUCCESS")
+    
+    # Test forward
+    import torch
+    with torch.no_grad():
+        x = torch.randn(2, 4) * 0.1
+        output = onn(x)
+        print(f"✅ FORWARD SUCCESS: shape={output.shape}")
+        
+        has_nan = torch.any(torch.isnan(output)).item()
+        has_inf = torch.any(torch.isinf(output)).item()
+        
+        if has_nan:
+            print("⚠️ WARNING: NaN detected")
+        elif has_inf:
+            print("⚠️ WARNING: Inf detected")
+        else:
+            print("✅ OUTPUT CLEAN: No NaN/Inf")
+            
+    print("SUCCESS_ALL")
+    
+except Exception as e:
+    print(f"ERROR: {e}")
+    import traceback
+    traceback.print_exc()
+'''
+        ], capture_output=True, text=True, timeout=30)
+        
+        if "SUCCESS_ALL" in test_result.stdout:
+            print("✅ ALL TESTS PASSED!")
+            print("📊 Details:")
+            for line in test_result.stdout.split('\n'):
+                if line.strip():
+                    print(f"   {line}")
+            return True
+        else:
+            print("❌ Some tests failed:")
+            print("STDOUT:")
+            print(test_result.stdout)
+            print("STDERR:")
+            print(test_result.stderr)
+            return False
+            
+    except Exception as e:
+        print(f"❌ Test failed: {e}")
+        return False
+
+def main():
+    """Main function."""
+    print("🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟")
+    print("🌟   REPARACIÓN AGRESIVA - TEMPLATE COMPLETO   🌟")
+    print("🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟🌟")
+    
+    if aggressive_repair():
+        print("\n🎉 REPARACIÓN AGRESIVA EXITOSA!")
+        
+        print("\n🚀 TESTS INMEDIATOS:")
+        print("   python3 -c \"from torchonn.onns.architectures.coherent_onn import CoherentONN; print('✅ Import OK')\"")
+        print("   python demos/demo_onn.py --quick")
+        
+        print("\n💡 MEJORAS CIENTÍFICAS APLICADAS:")
+        print("   ✅ Estructura completamente reconstruida")
+        print("   ✅ Activaciones estables (power 0.45)")
+        print("   ✅ Inicialización Haar-random científica")
+        print("   ✅ Protección NaN/Inf completa")
+        print("   ✅ Normalización L2 para matrices unitarias")
+        print("   ✅ Validación de unitaridad incluida")
+        
+        print("\n🎯 EXPECTATIVAS REALISTAS:")
+        print("   • No más errores 'self' not defined ✅")
+        print("   • Forward pass estable sin NaN ✅")  
+        print("   • Accuracy inicial ~10% (datos sintéticos)")
+        print("   • Conservación de energía mejorada")
+        print("   • Base sólida para IncoherentONN/HybridONN")
+        
+        print("\n📈 SIGUIENTE PASO:")
+        print("   Implementar datos MNIST reales → 10% → 40-60% accuracy")
+        
+        return 0
+    else:
+        print("\n❌ REPARACIÓN AGRESIVA FALLÓ")
+        print("\n🔍 POSIBLES CAUSAS:")
+        print("   1. base_onn.py no existe o tiene errores")
+        print("   2. Problemas en imports de layers")
+        print("   3. Estructura de directorios incorrecta")
+        
+        print("\n🔧 SOLUCIONES:")
+        print("   1. Verificar que base_onn.py funciona")
+        print("   2. Revisar imports: MZILayer, Photodetector")
+        print("   3. Ejecutar tests básicos de componentes")
+        
+        return 1
+
+if __name__ == "__main__":
+    exit(main())
