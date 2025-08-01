@@ -26,11 +26,20 @@ try:
 except ImportError:
     COHERENT_AVAILABLE = False
 
+try:
+    from .incoherent_onn import IncoherentONN
+    INCOHERENT_AVAILABLE = True
+except ImportError:
+    INCOHERENT_AVAILABLE = False
+
 # Lista de arquitecturas disponibles
 __all__ = ["BaseONN", "validate_onn_implementation"]
 
 if COHERENT_AVAILABLE:
     __all__.append("CoherentONN")
+
+if INCOHERENT_AVAILABLE:
+    __all__.append("IncoherentONN")
 
 # Función helper para listar arquitecturas
 def list_available_architectures():
@@ -57,6 +66,20 @@ def list_available_architectures():
             "type": "coherent"
         }
     
+    if INCOHERENT_AVAILABLE:
+        architectures["IncoherentONN"] = {
+            "available": True,
+            "description": "Red incoherente usando microring arrays + WDM",
+            "type": "incoherent",
+            "reference": "Tait et al. (2017)"
+        }
+    else:
+        architectures["IncoherentONN"] = {
+            "available": False,
+            "description": "Red incoherente usando microring arrays (en desarrollo)",
+            "type": "incoherent"
+        }
+    
     return architectures
 
 # Función helper para crear arquitecturas
@@ -65,7 +88,7 @@ def create_onn(architecture: str, **kwargs):
     Factory function para crear arquitecturas ONN.
     
     Args:
-        architecture: Nombre de la arquitectura ("CoherentONN", etc.)
+        architecture: Nombre de la arquitectura ("CoherentONN", "IncoherentONN", etc.)
         **kwargs: Argumentos para el constructor
         
     Returns:
@@ -73,6 +96,8 @@ def create_onn(architecture: str, **kwargs):
     """
     if architecture == "CoherentONN" and COHERENT_AVAILABLE:
         return CoherentONN(**kwargs)
+    elif architecture == "IncoherentONN" and INCOHERENT_AVAILABLE:
+        return IncoherentONN(**kwargs)
     elif architecture == "BaseONN":
         return BaseONN(**kwargs)
     else:

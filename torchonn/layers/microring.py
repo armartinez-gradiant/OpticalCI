@@ -214,6 +214,7 @@ class MicroringResonator(nn.Module):
         
         validation['energy_conserved'] = energy_max < 1.05 and energy_min > 0.5
         validation['energy_conservation'] = energy_mean.item()
+        validation['expected_conservation'] = self.alpha
         validation['max_energy'] = energy_max.item()
         validation['min_energy'] = energy_min.item()
         

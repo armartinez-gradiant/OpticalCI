@@ -280,17 +280,28 @@ class CoherentONN(BaseONN):
         
         # Theoretical speedup basado en paralelización óptica
         theoretical_speedup = min(10.0, optical_fraction * 2.0 + 1.0)
+
+            # ✅ AGREGADO: Calcular operaciones ópticas totales
+        total_optical_operations = 0
+        for i in range(len(self.optical_layers)):
+            in_size = self.layer_sizes[i]
+            out_size = self.layer_sizes[i + 1]
+            total_optical_operations += in_size * out_size
+        
+        # ✅ AGREGADO: También incluir operaciones de photodetección
+        total_optical_operations += sum(self.layer_sizes[:-1])  # Una operación por photodetector
         
         return {
             "n_optical_layers": len(self.optical_layers),
             "n_photodetectors": len(self.photodetectors),
             "theoretical_speedup": theoretical_speedup,
             "optical_fraction": optical_fraction,
+            "optical_operations": total_optical_operations,  # ✅ NUEVA LÍNEA
             "total_optical_parameters": total_optical_params,
             "total_electrical_parameters": electrical_params,
             "parameter_efficiency": self._n_parameters / max(1, sum(self.layer_sizes)),
             "optical_parameter_ratio": total_optical_params / max(1, total_optical_params + electrical_params),
-            "estimated_power_consumption": optical_fraction * 0.1 + (1 - optical_fraction) * 1.0,  # W
+            "estimated_power_consumption": optical_fraction * 0.1 + (1 - optical_fraction) * 1.0,
             "parallelization_factor": len(self.optical_layers)
         }
     
