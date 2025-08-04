@@ -38,6 +38,14 @@ import time
 import warnings
 from typing import Dict, Any, List
 
+# 🔧 PATCH: Use fixed version
+try:
+    from fix_incoherent_onn import FixedIncoherentONN
+    IncoherentONN = FixedIncoherentONN  # Override
+    print("🔧 Using FixedIncoherentONN (gradients work!)")
+except ImportError:
+    print("⚠️ Using original IncoherentONN")
+
 # Configurar warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
