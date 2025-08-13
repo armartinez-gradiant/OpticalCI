@@ -27,3 +27,18 @@ __all__ = [
     "print_model_summary",
     "setup_logging",
 ]
+
+# Phase Shifter Extractor
+from .phase_shifter_extractor import (
+    PhaseShifterExtractor,
+    quick_extract,
+    quick_apply,
+    quick_summary
+)
+
+__all__.extend([
+    "PhaseShifterExtractor",
+    "quick_extract", 
+    "quick_apply",
+    "quick_summary",
+])

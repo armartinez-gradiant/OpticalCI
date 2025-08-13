@@ -1,0 +1,57 @@
+{
+  "model_info": {
+    "model_class": "Simple3x3ONN",
+    "total_parameters": 6,
+    "device": "cpu"
+  },
+  "layers": {
+    "layer_00_mzi_layer": {
+      "type": "MZILayer",
+      "in_features": 3,
+      "out_features": 3,
+      "n_mzis": 3,
+      "mzis": {
+        "MZI_00": {
+          "theta": {
+            "radians": 2.8649260997772217,
+            "degrees": 164.14816284179688,
+            "normalized": 0.4559671503725294
+          },
+          "phi": {
+            "radians": 3.869687795639038,
+            "degrees": 221.71676635742188,
+            "normalized": 0.6158799408983331
+          }
+        },
+        "MZI_01": {
+          "theta": {
+            "radians": 1.0779215097427368,
+            "degrees": 61.76034927368164,
+            "normalized": 0.17155653654063518
+          },
+          "phi": {
+            "radians": 2.6886935234069824,
+            "degrees": 154.05078125,
+            "normalized": 0.42791886470938584
+          }
+        },
+        "MZI_02": {
+          "theta": {
+            "radians": 3.9073641300201416,
+            "degrees": 223.87545776367188,
+            "normalized": 0.6218763157526688
+          },
+          "phi": {
+            "radians": 0.6496394872665405,
+            "degrees": 37.22159957885742,
+            "normalized": 0.10339333562615433
+          }
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_layers": 1,
+    "total_phase_shifters": 6
+  }
+}

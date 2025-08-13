@@ -1,14 +1,15 @@
 """
-Ejemplo Completo: Red Óptica 3x3 con 3 MZIs
-===========================================
+Ejemplo 3x3 MZI - Para examples/example_3x3_mzi.py
+==================================================
 
-Este ejemplo demuestra:
-1. Como crear una red 3x3 con exactamente 3 MZIs
-2. Ver los valores theta y phi de cada phase shifter
-3. Entender la multiplicación matricial unitaria
-4. Extraer y usar estos valores
+Ejemplo completo de una red óptica 3x3 con extracción de phase shifters.
+Demuestra multiplicación matricial unitaria y uso del PhaseShifterExtractor.
 
-Copia este código para entender el funcionamiento básico.
+Ubicación: /workspaces/OpticalCI/examples/example_3x3_mzi.py
+
+Ejecutar con:
+    cd /workspaces/OpticalCI
+    python examples/example_3x3_mzi.py
 """
 
 import torch
@@ -16,13 +17,22 @@ import torch.nn as nn
 import numpy as np
 import sys
 import os
+from pathlib import Path
 
-# Importar OpticalCI (ajusta la ruta según tu instalación)
+# Añadir el directorio raíz del proyecto al path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+# Importaciones de OpticalCI
 try:
     from torchonn.layers import MZILayer
-    from PhaseShifterExtractor import PhaseShifterExtractor, quick_extract
-except ImportError:
-    print("⚠️ Asegúrate de tener OpticalCI instalado y el PhaseShifterExtractor en tu directorio")
+    from torchonn.utils.phase_shifter_extractor import PhaseShifterExtractor, quick_extract
+    print("🌟 OpticalCI cargado exitosamente!")
+except ImportError as e:
+    print(f"❌ Error importando OpticalCI: {e}")
+    print("Asegúrate de estar en el directorio raíz de OpticalCI y que esté instalado:")
+    print("  cd /workspaces/OpticalCI")
+    print("  pip install -e .")
     sys.exit(1)
 
 class Simple3x3ONN(nn.Module):
@@ -31,8 +41,8 @@ class Simple3x3ONN(nn.Module):
     
     Arquitectura:
     - 1 capa MZI de 3x3 
-    - 3 MZIs físicos internos
-    - 6 phase shifters totales (2 por MZI)
+    - 3 MZIs físicos internos (para matriz 3x3)
+    - 6 phase shifters totales (2 por MZI: θ y φ)
     """
     
     def __init__(self, device=None):
@@ -73,7 +83,7 @@ class Simple3x3ONN(nn.Module):
             phi_values: Lista de 3 valores phi [rad] 
         """
         if len(theta_values) != 3 or len(phi_values) != 3:
-            raise ValueError("Necesitas exactamente 3 valores theta y 3 phi")
+            raise ValueError("Necesitas exactamente 3 valores theta y 3 phi para una red 3x3")
         
         with torch.no_grad():
             self.mzi_layer.theta.copy_(torch.tensor(theta_values, device=self.device))
@@ -84,9 +94,7 @@ class Simple3x3ONN(nn.Module):
             print(f"   MZI_{i}: θ={np.degrees(theta_values[i]):6.1f}°, φ={np.degrees(phi_values[i]):6.1f}°")
 
 def demo_multiplicacion_unitaria():
-    """
-    Demostración de multiplicación matricial unitaria.
-    """
+    """Demo de multiplicación matricial unitaria."""
     print("\n" + "="*70)
     print("🧮 DEMO: MULTIPLICACIÓN MATRICIAL UNITARIA")
     print("="*70)
@@ -104,7 +112,6 @@ def demo_multiplicacion_unitaria():
     U_np = U.detach().cpu().numpy()
     
     print(f"\n📊 Matriz Unitaria U (3×3):")
-    print(f"   Valores complejos actuales:")
     for i in range(3):
         row = [f"{U_np[i,j].real:+.3f}{U_np[i,j].imag:+.3f}j" for j in range(3)]
         print(f"   [{', '.join(row)}]")
@@ -126,12 +133,13 @@ def demo_multiplicacion_unitaria():
     son_iguales = np.allclose(salida_np, U_entrada, atol=1e-6)
     print(f"   ✅ Son iguales: {son_iguales}")
     
+    if son_iguales:
+        print("   🎉 ¡Confirmado! La salida = U × entrada (multiplicación matricial unitaria)")
+    
     return model, entrada, salida_modelo
 
 def demo_phase_shifters_especificos():
-    """
-    Demo con valores específicos de phase shifters.
-    """
+    """Demo con valores específicos de phase shifters."""
     print("\n" + "="*70)
     print("🔧 DEMO: PHASE SHIFTERS ESPECÍFICOS")
     print("="*70)
@@ -171,9 +179,7 @@ def demo_phase_shifters_especificos():
     return model
 
 def demo_extraccion_completa():
-    """
-    Demo completo de extracción de phase shifters.
-    """
+    """Demo completo de extracción de phase shifters."""
     print("\n" + "="*70)
     print("💾 DEMO: EXTRACCIÓN COMPLETA DE VALORES")
     print("="*70)
@@ -194,8 +200,9 @@ def demo_extraccion_completa():
     # Mostrar resumen
     extractor.print_summary(valores_extraidos)
     
-    # Guardar a archivo
-    extractor.save_to_file(valores_extraidos, "ejemplo_3x3_weights.json")
+    # Guardar a archivo en la carpeta examples
+    output_file = project_root / "examples" / "ejemplo_3x3_weights.json"
+    extractor.save_to_file(valores_extraidos, str(output_file))
     
     # Crear nuevo modelo y cargar valores
     print(f"\n🔄 Probando carga en modelo nuevo...")
@@ -214,12 +221,10 @@ def demo_extraccion_completa():
     
     return valores_extraidos
 
-def demo_analisis_matriz_unitaria():
-    """
-    Análisis detallado de propiedades de la matriz unitaria.
-    """
+def demo_analisis_fisica():
+    """Análisis de propiedades físicas de la matriz unitaria."""
     print("\n" + "="*70)
-    print("🔬 DEMO: ANÁLISIS DE MATRIZ UNITARIA")
+    print("🔬 DEMO: ANÁLISIS DE PROPIEDADES FÍSICAS")
     print("="*70)
     
     model = Simple3x3ONN()
@@ -228,7 +233,7 @@ def demo_analisis_matriz_unitaria():
     U = model.get_unitary_matrix()
     U_np = U.detach().cpu().numpy()
     
-    # Test 1: U @ U^† = I (identidad)
+    # Test 1: U @ U^† = I (propiedad unitaria)
     U_dagger = U_np.conj().T  # Conjugado transpuesto
     producto = U_np @ U_dagger
     identidad = np.eye(3)
@@ -262,17 +267,22 @@ def demo_analisis_matriz_unitaria():
     print(f"   Ratio promedio: {torch.mean(ratio_energia):.6f}")
     print(f"   Error máximo: {error_energia:.2e}")
     print(f"   ✅ Energía conservada: {error_energia < 1e-6}")
+    
+    # Test 4: Uso del extractor rápido
+    print(f"\n📊 Test 4 - Extracción rápida:")
+    valores = quick_extract(model, str(project_root / "examples" / "quick_test.json"))
+    
+    print(f"   ✅ Extracción completada")
 
 def main():
-    """
-    Función principal que ejecuta todos los demos.
-    """
+    """Función principal que ejecuta todos los demos."""
     print("🌟" * 35)
     print("🌟  EJEMPLO COMPLETO: RED 3×3 CON 3 MZIs  🌟")
     print("🌟" * 35)
-    print(f"📚 Demostrando multiplicación matricial unitaria")
+    print(f"📚 Multiplicación matricial unitaria: salida = U × entrada")
     print(f"🔧 Extracción de valores theta y phi")
     print(f"💾 Guardado y carga de parámetros")
+    print(f"📁 Ubicación: {project_root}")
     
     try:
         # Demo 1: Multiplicación matricial unitaria
@@ -284,25 +294,39 @@ def main():
         # Demo 3: Extracción completa
         valores = demo_extraccion_completa()
         
-        # Demo 4: Análisis de propiedades unitarias
-        demo_analisis_matriz_unitaria()
+        # Demo 4: Análisis de propiedades físicas
+        demo_analisis_fisica()
         
         print(f"\n🎉 ¡TODOS LOS DEMOS COMPLETADOS!")
-        print(f"   📁 Archivo generado: ejemplo_3x3_weights.json")
+        print(f"   📁 Archivos generados en: {project_root}/examples/")
+        print(f"      - ejemplo_3x3_weights.json")
+        print(f"      - quick_test.json")
         print(f"   🔬 La red 3×3 funciona correctamente")
         print(f"   ⚖️ Multiplicación matricial unitaria verificada")
         
         # Resumen final
         print(f"\n📋 RESUMEN TÉCNICO:")
         print(f"   • Red: 3 entradas → 3 salidas")
-        print(f"   • MZIs físicos: 3")
-        print(f"   • Phase shifters: 6 (2 por MZI)")
+        print(f"   • MZIs físicos: 3 (para matriz 3×3)")
+        print(f"   • Phase shifters: 6 (θ y φ por cada MZI)")
         print(f"   • Operación: salida = U × entrada")
-        print(f"   • U es matriz unitaria 3×3")
+        print(f"   • U es matriz unitaria 3×3 compleja")
+        print(f"   • Conserva energía: ||salida|| = ||entrada||")
+        
+        print(f"\n🎯 PRÓXIMOS PASOS:")
+        print(f"   1. Usa los valores extraídos para inferencia")
+        print(f"   2. Implementa estos valores en hardware real")
+        print(f"   3. Escala a redes más grandes (4×4, 8×8, etc.)")
+        print(f"   4. Entrena con datos reales para problemas específicos")
         
     except Exception as e:
         print(f"❌ Error en la demostración: {e}")
-        print(f"   Verifica que OpticalCI esté instalado correctamente")
+        import traceback
+        traceback.print_exc()
+        print(f"\n🔧 TROUBLESHOOTING:")
+        print(f"   1. Verifica que OpticalCI esté instalado: pip install -e .")
+        print(f"   2. Asegúrate de estar en el directorio correcto: {project_root}")
+        print(f"   3. Verifica que el archivo phase_shifter_extractor.py esté en torchonn/utils/")
 
 if __name__ == "__main__":
     main()

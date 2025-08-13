@@ -1,0 +1,1 @@
+# Utilidades Comunes - Herramientas reutilizables

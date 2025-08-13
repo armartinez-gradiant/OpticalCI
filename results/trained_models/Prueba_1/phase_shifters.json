@@ -1,0 +1,57 @@
+{
+  "model_info": {
+    "model_class": "MZILayer",
+    "total_parameters": 6,
+    "device": "cpu"
+  },
+  "layers": {
+    "layer_00": {
+      "type": "MZILayer",
+      "in_features": 3,
+      "out_features": 3,
+      "n_mzis": 3,
+      "mzis": {
+        "MZI_00": {
+          "theta": {
+            "radians": 4.02061653137207,
+            "degrees": 230.36434936523438,
+            "normalized": 0.6399009952448554
+          },
+          "phi": {
+            "radians": 3.743278741836548,
+            "degrees": 214.47406005859375,
+            "normalized": 0.5957613151340974
+          }
+        },
+        "MZI_01": {
+          "theta": {
+            "radians": 5.264608383178711,
+            "degrees": 301.63983154296875,
+            "normalized": 0.8378884476259228
+          },
+          "phi": {
+            "radians": -1.0134670734405518,
+            "degrees": -58.0673828125,
+            "normalized": -0.16129829439894072
+          }
+        },
+        "MZI_02": {
+          "theta": {
+            "radians": 1.5613081455230713,
+            "degrees": 89.45635986328125,
+            "normalized": 0.24848990904963705
+          },
+          "phi": {
+            "radians": 3.8536770343780518,
+            "degrees": 220.79942321777344,
+            "normalized": 0.6133317491009829
+          }
+        }
+      }
+    }
+  },
+  "summary": {
+    "total_layers": 1,
+    "total_phase_shifters": 6
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "architecture": {
+    "type": "single_layer",
+    "input_size": 4,
+    "output_size": 4,
+    "layer_type": "MZI"
+  },
+  "data": {
+    "type": "synthetic_function",
+    "function": "polynomial",
+    "n_samples": 1000,
+    "input_size": 4,
+    "degree": 2,
+    "noise_level": 0.1
+  },
+  "training": {
+    "learning_rate": 0.01,
+    "epochs": 100
+  },
+  "train_ratio": 0.8,
+  "device": "auto",
+  "results_dir": "results/experiments"
+}
